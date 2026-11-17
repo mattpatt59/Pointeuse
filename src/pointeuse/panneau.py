@@ -168,6 +168,7 @@ class OngletPointer(QWidget):
         largeur_texte = (settings.LARGEUR_PANNEAU_PX - marges) // colonnes - 2 * 14   # padding du bouton
         for rang, raccourci in enumerate(raccourcis):
             bouton = QPushButton(objectName="raccourci")
+            bouton.ensurePolished()   # police de la feuille de style (gras) pour mesurer le texte
             bouton.setText(bouton.fontMetrics().elidedText(raccourci.libelle, Qt.ElideRight, largeur_texte))
             bouton.setToolTip(self._info_raccourci(raccourci))
             bouton.clicked.connect(lambda _=False, r=raccourci: self.lancer_raccourci(r))

@@ -386,6 +386,15 @@ def textes_raccourcis(pointer) -> list[str]:
     return [b.text() for b in pointer.boutons_raccourcis]
 
 
+def texte_ou_debut(texte: str, libelle: str) -> bool:
+    """Le libellé entier, ou son début suivi de « … » : l'endroit de la coupure dépend de la
+    police de l'OS (sous Windows, la CI hors écran coupe même « Delta Services »)."""
+    if texte == libelle:
+        return True
+    debut = texte.removesuffix("…")
+    return texte.endswith("…") and len(debut) >= 3 and libelle.startswith(debut)
+
+
 def test_etat_des_boutons(pointer, moteur, horloge):
     assert not pointer.bouton_modifier.isEnabled()
     assert not pointer.bouton_stop.isEnabled()
@@ -433,10 +442,8 @@ def test_boutons_rapides_affiches_et_reconstruits(pointer, moteur):
     ajouter_raccourcis(moteur)
     pointer.rafraichir()
     textes = textes_raccourcis(pointer)
-    # Tronqué « … » à la largeur d'une colonne ; la coupure dépend de la police de l'OS.
-    assert textes[0].startswith("Alpha")
-    assert "Alpha Industrie – Armoire ligne 2".startswith(textes[0].removesuffix("…"))
-    assert textes[1] == "Delta Services"
+    assert texte_ou_debut(textes[0], "Alpha Industrie – Armoire ligne 2")
+    assert texte_ou_debut(textes[1], "Delta Services")
     assert "Projet : Armoire ligne 2" in pointer.boutons_raccourcis[0].toolTip()
     assert not pointer.titre_raccourcis.isHidden()
     assert "à compléter" in pointer.boutons_raccourcis[1].toolTip()
