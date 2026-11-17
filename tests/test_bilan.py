@@ -47,7 +47,7 @@ def test_preparer_bilan(tmp_path):
     assert settings.MARQUEUR_DONNEES_BILAN not in html
     balise = f'<script src="{settings.NOM_FICHIER_DONNEES_BILAN}"></script>'
     assert html.index(balise) < html.index('<script src="pointeuse.js">')   # données d'abord
-    for nom in ("pointeuse.css", "pointeuse.js", "logo.png"):
+    for nom in ("pointeuse.css", "fusion.js", "pointeuse.js", "logo.png"):
         assert (dossier / nom).exists()
     donnees = relire_donnees((dossier / settings.NOM_FICHIER_DONNEES_BILAN).read_text(encoding="utf-8"))
     assert donnees["texte"] == contenu   # BOM retiré

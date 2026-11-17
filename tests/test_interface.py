@@ -14,6 +14,7 @@ from PySide6.QtWidgets import QApplication, QDialog  # noqa: E402
 from pointeuse.affichage import duree_texte, texte_info_bulle, texte_statut, version_courte  # noqa: E402
 from pointeuse.config import Config  # noqa: E402
 from pointeuse.dialogue_absence import DialogueAbsence  # noqa: E402
+from pointeuse.evenements import ARRET, DEMARRAGE, DEVERROUILLAGE, VERROUILLAGE, JournalEvenements  # noqa: E402
 from pointeuse.journal import Journal  # noqa: E402
 from pointeuse.moteur import Absence, LigneOuverte, Moteur  # noqa: E402
 from pointeuse.panneau import Panneau  # noqa: E402
@@ -127,6 +128,12 @@ def test_nouveau_client_saisi_ajoute_aux_listes(pointer, moteur):
     pointer.demarrer()
     clients = [pointer.formulaire.client.itemText(i) for i in range(pointer.formulaire.client.count())]
     assert "Delta Services" in clients
+
+
+def test_textes_statut_repas():
+    repas = LigneOuverte(datetime(2026, 11, 17, 12, 0), "PAUSE", description="Repas")
+    assert texte_statut(repas, datetime(2026, 11, 17, 12, 30)) == "En pause (Repas) depuis 12:00"
+    assert texte_info_bulle(repas, datetime(2026, 11, 17, 12, 30)) == "En pause (Repas) depuis 12:00 (0 h 30)"
 
 
 def test_modifier_la_description_en_cours(pointer, moteur):
@@ -291,3 +298,198 @@ def test_inserer_plage_invalide_message(panneau, moteur, monkeypatch):
 @pytest.mark.parametrize("version, texte", [("0.1.0", "V0.1"), ("1.0.0", "V1.0"), ("0.1.2", "V0.1.2")])
 def test_version_courte(version, texte):
     assert version_courte(version) == texte
+
+
+# ─── Journal des événements dans la vue Journée (étape 8) ────────────────────
+
+@pytest.fixture
+def journal_poste(moteur, tmp_path):
+    moteur.evenements = JournalEvenements(tmp_path / "pointeuse_journal.csv",
+                                          lambda: moteur.config.reglage("retention_journal_jours"))
+    for heure, nature in (("07:30", DEMARRAGE), ("08:30", VERROUILLAGE), ("08:40", DEVERROUILLAGE)):
+        h, m = heure.split(":")
+        moteur.evenements.noter(nature, datetime(2026, 11, 17, int(h), int(m)))
+    return moteur.evenements
+
+
+def textes_journee(panneau) -> list[tuple[str, str]]:
+    arbre = panneau.journee.lignes
+    return [(arbre.topLevelItem(i).text(0), arbre.topLevelItem(i).text(1)) for i in range(arbre.topLevelItemCount())]
+
+
+def test_journee_evenements_et_moments_non_pointes(panneau, moteur, horloge, journal_poste):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")      # 09:00
+    horloge["t"] = datetime(2026, 11, 17, 9, 30)
+    panneau.journee.rafraichir()
+    assert textes_journee(panneau) == [
+        ("07:30", "◦ démarrage de la pointeuse"),
+        ("07:30–08:30", "▒ non pointé — cliquer pour insérer"),
+        ("08:30", "◦ verrouillage"),
+        ("08:40", "◦ déverrouillage"),
+        ("08:40–09:00", "▒ non pointé — cliquer pour insérer"),
+        ("09:00– …", "Alpha Industrie / Armoire ligne 2  (en cours)"),
+    ]
+
+
+def test_clic_sur_un_moment_non_pointe(panneau, moteur, horloge, journal_poste):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge["t"] = datetime(2026, 11, 17, 9, 30)
+    journee = panneau.journee
+    journee.rafraichir()
+    trou = journee.lignes.topLevelItem(4)
+    journee.lignes.itemClicked.emit(trou, 1)
+    assert journee.plage() == (datetime(2026, 11, 17, 8, 40), datetime(2026, 11, 17, 9, 0))
+    journee.lignes.itemClicked.emit(journee.lignes.topLevelItem(0), 1)   # un événement : rien ne change
+    assert journee.plage() == (datetime(2026, 11, 17, 8, 40), datetime(2026, 11, 17, 9, 0))
+
+
+def test_masquer_le_journal_enregistre_dans_la_config(panneau, moteur, journal_poste):
+    journee = panneau.journee
+    journee.rafraichir()
+    assert not journee.masquer_journal.isHidden()
+    journee.masquer_journal.setChecked(True)
+    assert moteur.config.reglage("afficher_journal") is False
+    assert "afficher_journal = false" in moteur.config.chemin.read_text(encoding="utf-8")
+    assert all(not t.startswith(("◦", "▒")) for _, t in textes_journee(panneau))
+    journee.masquer_journal.setChecked(False)
+    assert len(textes_journee(panneau)) == 5
+
+
+def test_case_cachee_sans_journal(panneau, moteur, journal_poste):
+    moteur.config.modifier_reglage("retention_journal_jours", 0)
+    panneau.journee.rafraichir()
+    assert panneau.journee.masquer_journal.isHidden()
+    assert textes_journee(panneau) == []
+
+
+# ─── Onglet Pointer : Modifier, Stop, Repas, boutons rapides (CDC onglet_pointer.md) ─
+
+RACCOURCIS = """
+[[raccourcis]]
+client = "Alpha Industrie"
+projet = "Armoire ligne 2"
+
+[[raccourcis]]
+client = "Delta Services"
+"""
+
+
+def ajouter_raccourcis(moteur, texte=RACCOURCIS):
+    chemin = moteur.config.chemin
+    chemin.write_text(chemin.read_text(encoding="utf-8") + texte, encoding="utf-8")
+    etat = chemin.stat()
+    os.utime(chemin, ns=(etat.st_atime_ns, etat.st_mtime_ns + 1_000_000_000))
+    moteur.config.recharger_si_modifie()
+
+
+def textes_raccourcis(pointer) -> list[str]:
+    return [b.text() for b in pointer.boutons_raccourcis]
+
+
+def test_etat_des_boutons(pointer, moteur, horloge):
+    assert not pointer.bouton_modifier.isEnabled()
+    assert not pointer.bouton_stop.isEnabled()
+    assert pointer.bouton_repas.isEnabled()
+    assert pointer.titre_raccourcis.isHidden()
+
+    pointer.formulaire.remplir("Alpha Industrie", "Armoire ligne 2")
+    pointer.demarrer()
+    assert pointer.bouton_modifier.isEnabled()
+    assert pointer.bouton_stop.isEnabled()
+
+    horloge["t"] = datetime(2026, 11, 17, 12, 0)
+    pointer.repas()
+    assert moteur.ligne_ouverte.description == "Repas"
+    assert not pointer.bouton_repas.isEnabled()
+    assert not pointer.bouton_modifier.isEnabled()
+    assert pointer.bouton_pause.text().endswith("Reprendre")
+    assert "pause (Repas)" in pointer.statut_texte.text()
+
+
+def test_stop(pointer, moteur, horloge):
+    pointer.formulaire.remplir("Alpha Industrie", "Armoire ligne 2")
+    pointer.demarrer()
+    horloge["t"] = datetime(2026, 11, 17, 18, 0)
+    pointer.stop()
+    assert moteur.ligne_ouverte is None
+    assert [(l.client, l.duree_min) for l in moteur.journal.lire()] == [("Alpha Industrie", 540)]
+    assert pointer.statut_texte.text().endswith("Aucune tâche en cours")
+    assert not pointer.bouton_stop.isEnabled()
+
+
+def test_modifier_la_tache_en_cours(pointer, moteur, horloge):
+    pointer.formulaire.remplir("Alpha Industrie", "Armoire ligne 2")
+    pointer.demarrer()
+    horloge["t"] = datetime(2026, 11, 17, 9, 30)
+    pointer.formulaire.remplir("Bêta Automatismes", "Carte capteur v2", "routage", "nappe")
+    pointer.modifier()
+    ouverte = moteur.ligne_ouverte
+    assert (ouverte.debut.hour, ouverte.client, ouverte.tache, ouverte.description) == (
+        9, "Bêta Automatismes", "routage", "nappe")
+    assert moteur.journal.lire() == []
+
+
+def test_boutons_rapides_affiches_et_reconstruits(pointer, moteur):
+    ajouter_raccourcis(moteur)
+    pointer.rafraichir()
+    textes = textes_raccourcis(pointer)
+    assert textes[0].startswith("Alpha Industrie – ")   # tronqué « … » à la largeur d'une colonne
+    assert textes[1] == "Delta Services"
+    assert "Projet : Armoire ligne 2" in pointer.boutons_raccourcis[0].toolTip()
+    assert not pointer.titre_raccourcis.isHidden()
+    assert "à compléter" in pointer.boutons_raccourcis[1].toolTip()
+    premier = pointer.boutons_raccourcis[0]
+    pointer.rafraichir()                       # liste inchangée : mêmes boutons
+    assert pointer.boutons_raccourcis[0] is premier
+
+
+def test_libelle_long_raccourci(pointer, moteur):
+    ajouter_raccourcis(moteur, '[[raccourcis]]\nclient = "Alpha Industrie"\nprojet = "' + "x" * 80 + '"\n')
+    pointer.rafraichir()
+    bouton = pointer.boutons_raccourcis[0]
+    assert bouton.text().endswith("…")
+    assert "x" * 80 in bouton.toolTip()
+
+
+def test_bouton_rapide_demarre(pointer, moteur, horloge):
+    ajouter_raccourcis(moteur)
+    pointer.rafraichir()
+    pointer.boutons_raccourcis[0].click()
+    assert (moteur.ligne_ouverte.client, moteur.ligne_ouverte.projet) == ("Alpha Industrie", "Armoire ligne 2")
+    assert pointer.formulaire.projet.currentText() == "Armoire ligne 2"
+    assert pointer.formulaire.projet.property("a_completer") is False
+
+    # Même tâche déjà en cours : la description saisie n'est pas effacée.
+    moteur.modifier_description("en cours")
+    pointer.boutons_raccourcis[0].click()
+    assert moteur.ligne_ouverte.description == "en cours"
+
+
+def test_bouton_rapide_client_seul_projet_en_rouge(pointer, moteur, horloge):
+    ajouter_raccourcis(moteur)
+    pointer.rafraichir()
+    pointer.boutons_raccourcis[1].click()
+    assert (moteur.ligne_ouverte.client, moteur.ligne_ouverte.projet) == ("Delta Services", "")
+    assert "Delta Services" in moteur.config.clients()
+    assert pointer.formulaire.projet.currentText() == ""
+    assert pointer.formulaire.projet.property("a_completer") is True
+
+    pointer.formulaire.projet.setCurrentText("Audit")
+    pointer.modifier()
+    assert moteur.ligne_ouverte.projet == "Audit"
+    assert pointer.formulaire.projet.property("a_completer") is False
+
+
+# ─── Onglet « À propos » ─────────────────────────────────────────────────────
+
+def test_onglet_a_propos(panneau):
+    from pointeuse import __version__, settings
+    onglets = [panneau.onglets.tabText(i) for i in range(panneau.onglets.count())]
+    assert onglets == ["Pointer", "Insérer / Journée", "À propos"]
+    texte = " ".join(bloc.text() for bloc in panneau.a_propos.blocs)
+    assert f'href="{settings.URL_DEPOT}"' in texte
+    assert "github.com/mattpatt59/Pointeuse" in texte
+    assert f'href="{settings.URL_SITE_SOCIETE}"' in texte
+    assert __version__ in texte
+    assert all(bloc.openExternalLinks() for bloc in panneau.a_propos.blocs)
+    assert panneau.a_propos.logo.pixmap() is not None and not panneau.a_propos.logo.pixmap().isNull()

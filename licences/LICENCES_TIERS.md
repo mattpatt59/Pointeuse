@@ -21,4 +21,4 @@ bibliothèques séparées, dans le sous-dossier `_internal/` (`_internal/PySide6
 (par exemple recompilée à partir du code source indiqué ci-dessus) : la Pointeuse
 utilisera les fichiers présents dans ce dossier au prochain lancement.
 
-Le code source de la Pointeuse est disponible sur demande auprès de T-Elec.
+Le code source de la Pointeuse est libre (licence MIT) : https://github.com/mattpatt59/Pointeuse

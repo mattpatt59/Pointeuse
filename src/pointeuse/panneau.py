@@ -1,21 +1,23 @@
-"""Panneau ouvert au clic sur l'icône : onglets « Pointer » et « Insérer / Journée » (onglet_journee.py)."""
+"""Panneau ouvert au clic sur l'icône : onglets « Pointer », « Insérer / Journée » (onglet_journee.py)
+et « À propos » (onglet_a_propos.py)."""
 
 from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QCheckBox, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton,
+from PySide6.QtWidgets import (QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QMessageBox, QPushButton,
                                QTabWidget, QVBoxLayout, QWidget)
 
 from pointeuse import settings
 from pointeuse.affichage import duree_texte, minutes_ecoulees, texte_statut, titre_application
-from pointeuse.config import ConfigInvalide
+from pointeuse.config import ConfigInvalide, Raccourci
 from pointeuse.formulaire import FormulaireTache
 from pointeuse.moteur import Moteur
+from pointeuse.onglet_a_propos import OngletAPropos
 from pointeuse.onglet_journee import OngletJournee
 
 
 class OngletPointer(QWidget):
-    """Onglet 1 : démarrer une tâche, pause / reprendre."""
+    """Onglet 1 : démarrer / modifier une tâche, pause / reprendre, stop, repas, boutons rapides."""
 
     etat_change = Signal()
 
@@ -37,13 +39,37 @@ class OngletPointer(QWidget):
         self.formulaire = FormulaireTache(moteur.config)
         self.formulaire.description.editingFinished.connect(self._description_modifiee)
 
+        # Ligne 1 : la tâche (Modifier garde l'heure de début, Démarrer coupe et en ouvre une autre).
+        self.bouton_modifier = QPushButton("✎  Modifier")
+        self.bouton_modifier.setToolTip("Corrige la tâche en cours avec le formulaire, sans la couper")
         self.bouton_demarrer = QPushButton("▶  Démarrer", objectName="primaire")
-        self.bouton_pause = QPushButton()
+        self.bouton_demarrer.setToolTip("Termine la ligne en cours et démarre la tâche du formulaire")
+        self.bouton_modifier.clicked.connect(self.modifier)
         self.bouton_demarrer.clicked.connect(self.demarrer)
+        ligne_tache = QHBoxLayout()
+        ligne_tache.addWidget(self.bouton_modifier)
+        ligne_tache.addWidget(self.bouton_demarrer)
+
+        # Ligne 2 : s'arrêter.
+        self.bouton_pause = QPushButton()
+        self.bouton_stop = QPushButton("■  Stop", objectName="stop")
+        self.bouton_stop.setToolTip("Termine la ligne en cours, sans pause (fin de journée)")
+        self.bouton_repas = QPushButton(settings.DESCRIPTION_REPAS, objectName="pause")
+        self.bouton_repas.setToolTip(f"Pause « {settings.DESCRIPTION_REPAS} »")
         self.bouton_pause.clicked.connect(self.pause_ou_reprendre)
-        boutons = QHBoxLayout()
-        boutons.addWidget(self.bouton_demarrer)
-        boutons.addWidget(self.bouton_pause)
+        self.bouton_stop.clicked.connect(self.stop)
+        self.bouton_repas.clicked.connect(self.repas)
+        ligne_arret = QHBoxLayout()
+        ligne_arret.addWidget(self.bouton_pause)
+        ligne_arret.addWidget(self.bouton_stop)
+        ligne_arret.addWidget(self.bouton_repas)
+
+        # Boutons rapides [[raccourcis]] du fichier de config (reconstruits s'il change).
+        self.titre_raccourcis = QLabel("Boutons rapides", objectName="titre_raccourcis")
+        self.zone_raccourcis = QGridLayout()
+        self.zone_raccourcis.setSpacing(8)
+        self.boutons_raccourcis: list[QPushButton] = []
+        self._raccourcis_affiches: list[Raccourci] | None = None
 
         self.masques = QCheckBox("Afficher les projets masqués")
         self.masques.toggled.connect(self.formulaire.changer_affichage_masques)
@@ -54,7 +80,10 @@ class OngletPointer(QWidget):
         disposition.addWidget(self.statut)
         disposition.addWidget(self.alerte)
         disposition.addWidget(self.formulaire)
-        disposition.addLayout(boutons)
+        disposition.addLayout(ligne_tache)
+        disposition.addLayout(ligne_arret)
+        disposition.addWidget(self.titre_raccourcis)
+        disposition.addLayout(self.zone_raccourcis)
         disposition.addWidget(self.masques)
         disposition.addStretch()
 
@@ -99,6 +128,21 @@ class OngletPointer(QWidget):
         self.bouton_pause.style().unpolish(self.bouton_pause)
         self.bouton_pause.style().polish(self.bouton_pause)
 
+        en_tache = ligne is not None and not ligne.est_pause
+        self.bouton_modifier.setEnabled(en_tache)
+        self.bouton_stop.setEnabled(ligne is not None)
+        en_repas = (ligne is not None and ligne.est_pause
+                    and ligne.description == settings.DESCRIPTION_REPAS)
+        self.bouton_repas.setEnabled(not en_repas)
+
+        # Tâche lancée sans projet (bouton rapide « client seul ») : le champ Projet est en rouge.
+        projet = self.formulaire.projet
+        projet.setProperty("a_completer", en_tache and ligne.projet == "")
+        projet.style().unpolish(projet)
+        projet.style().polish(projet)
+
+        self.afficher_raccourcis()
+
         if self.moteur.derniere_erreur:
             message = self.moteur.derniere_erreur
             if self.moteur.ecriture_bloquee:
@@ -108,6 +152,41 @@ class OngletPointer(QWidget):
             self.alerte.show()
         else:
             self.alerte.hide()
+
+    def afficher_raccourcis(self) -> None:
+        """(Re)construit les boutons rapides si la liste du fichier de config a changé."""
+        raccourcis = self.moteur.config.raccourcis()
+        if raccourcis == self._raccourcis_affiches:
+            return
+        self._raccourcis_affiches = raccourcis
+        for bouton in self.boutons_raccourcis:
+            self.zone_raccourcis.removeWidget(bouton)
+            bouton.deleteLater()
+        self.boutons_raccourcis = []
+        colonnes = settings.COLONNES_RACCOURCIS
+        marges = 2 * 16 + (colonnes - 1) * 8          # marges de l'onglet, espace entre colonnes
+        largeur_texte = (settings.LARGEUR_PANNEAU_PX - marges) // colonnes - 2 * 14   # padding du bouton
+        for rang, raccourci in enumerate(raccourcis):
+            bouton = QPushButton(objectName="raccourci")
+            bouton.setText(bouton.fontMetrics().elidedText(raccourci.libelle, Qt.ElideRight, largeur_texte))
+            bouton.setToolTip(self._info_raccourci(raccourci))
+            bouton.clicked.connect(lambda _=False, r=raccourci: self.lancer_raccourci(r))
+            self.zone_raccourcis.addWidget(bouton, rang // colonnes, rang % colonnes)
+            self.boutons_raccourcis.append(bouton)
+        self.titre_raccourcis.setVisible(len(raccourcis) > 0)
+
+    @staticmethod
+    def _info_raccourci(raccourci: Raccourci) -> str:
+        lignes = [f"Client : {raccourci.client}"]
+        if raccourci.projet:
+            lignes.append(f"Projet : {raccourci.projet}")
+        else:
+            lignes.append("Projet : à compléter (bouton Modifier)")
+        if raccourci.tache:
+            lignes.append(f"Tâche : {raccourci.tache}")
+        if raccourci.description:
+            lignes.append(f"Description : {raccourci.description}")
+        return "\n".join(lignes)
 
     # ─── Actions ─────────────────────────────────────────────────────────────
 
@@ -123,6 +202,48 @@ class OngletPointer(QWidget):
             return
         self.formulaire.recharger()
         self.preremplir()
+        self._apres_action()
+
+    def modifier(self) -> None:
+        """Applique le formulaire à la tâche en cours, sans la couper."""
+        client, projet, tache, description = self.formulaire.valeurs()
+        if not client:
+            QMessageBox.warning(self, settings.NOM_APPLICATION, "Le client est obligatoire.")
+            return
+        try:
+            self.moteur.modifier(client, projet, tache, description)
+        except (ValueError, ConfigInvalide) as erreur:   # ValueError couvre NomReserve
+            QMessageBox.warning(self, settings.NOM_APPLICATION, str(erreur))
+            return
+        self.formulaire.recharger()
+        self.preremplir()
+        self._apres_action()
+
+    def lancer_raccourci(self, raccourci: Raccourci) -> None:
+        """Bouton rapide : démarre tout de suite, même sans projet (à compléter avec Modifier)."""
+        ouverte = self.moteur.ligne_ouverte
+        if (ouverte is not None and not ouverte.est_pause and not raccourci.description
+                and ouverte.meme_tache(raccourci.client, raccourci.projet, raccourci.tache)):
+            return   # déjà en cours : ne pas effacer la description saisie
+        tache = raccourci.tache
+        if not tache:
+            tache = None
+        try:
+            self.moteur.demarrer(raccourci.client, raccourci.projet, tache, raccourci.description,
+                                 projet_obligatoire=False)
+        except (ValueError, ConfigInvalide) as erreur:
+            QMessageBox.warning(self, settings.NOM_APPLICATION, str(erreur))
+            return
+        self.formulaire.recharger()
+        self.preremplir()
+        self._apres_action()
+
+    def stop(self) -> None:
+        self.moteur.arreter()
+        self._apres_action()
+
+    def repas(self) -> None:
+        self.moteur.pause(settings.DESCRIPTION_REPAS)
         self._apres_action()
 
     def pause_ou_reprendre(self) -> None:
@@ -169,6 +290,8 @@ class Panneau(QWidget):
         self.onglets.addTab(self.pointer, "Pointer")
         self.journee = OngletJournee(moteur, horloge)
         self.onglets.addTab(self.journee, "Insérer / Journée")
+        self.a_propos = OngletAPropos()
+        self.onglets.addTab(self.a_propos, "À propos")
         # Une action dans un onglet se voit tout de suite dans l'autre.
         self.pointer.etat_change.connect(self.journee.rafraichir)
         self.journee.etat_change.connect(self.pointer.rafraichir)

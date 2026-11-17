@@ -14,7 +14,7 @@ from pathlib import Path
 from pointeuse import settings
 
 DOSSIER_LECTEUR = Path(__file__).resolve().parent / "lecteur"
-FICHIERS_LECTEUR = ("pointeuse.css", "pointeuse.js", "logo.png")
+FICHIERS_LECTEUR = ("pointeuse.css", "fusion.js", "pointeuse.js", "logo.png")
 
 
 class CsvAbsent(Exception):

@@ -10,6 +10,7 @@ espaces autour (« alpha » = « Alpha ») pour ne pas créer de doublons.
 """
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import tomlkit
@@ -33,19 +34,57 @@ CONFIG_DEFAUT = """\
 [reglages]
 sauvegarde_min = 5          # fréquence de sauvegarde de la ligne en cours
 detection_absence_min = 2   # saut d'horloge considéré comme une veille
+absence_longue_h = 4        # absence plus longue (ou nuit) : pas de question au retour
+retention_journal_jours = 90  # journal des événements : durée de conservation (0 = pas de journal)
+afficher_journal = true     # vue Journée : événements et moments non pointés
 
-[clients."exemple-client"]
-"exemple-projet" = { taches = ["cdc", "dev", "tests"] }
+[clients."Perso"]
+"administratif" = { taches = [] }
+
+[clients."Client A"]
+"26-01-Projet" = { taches = ["Routage"] }
 
 # Tâches proposées dans tous les projets (facultatif, peut rester vide).
 [taches_communes]
 liste = ["réunion", "administratif"]
+
+# Boutons rapides de l'onglet « Pointer » (facultatif) : un clic démarre la tâche.
+# client obligatoire ; projet, tache, description facultatifs (pas de tâche sans projet) ;
+# nom = texte du bouton (par défaut « client – projet – tâche »). 8 boutons au plus.
+[[raccourcis]]
+nom = "Administratif"
+client = "Perso"
+projet = "administratif"
+
+[[raccourcis]]
+nom = "26-01_routage"
+client = "Client A"
+projet = "26-01-Projet"
+tache = "Routage"
 """
 
 # Clé qui masque un client ou un projet (true par défaut). Dans un client, elle côtoie
 # les projets : « visible » ne peut donc pas servir de nom de projet.
 CLE_VISIBLE = "visible"
 CLES_PROJET = ("taches", CLE_VISIBLE)
+CLES_RACCOURCI = ("nom", "client", "projet", "tache", "description")
+
+
+@dataclass(frozen=True)
+class Raccourci:
+    """Bouton rapide de l'onglet « Pointer » ([[raccourcis]] du fichier de config)."""
+    client: str
+    projet: str = ""
+    tache: str = ""
+    description: str = ""
+    nom: str = ""
+
+    @property
+    def libelle(self) -> str:
+        """Texte du bouton : le nom donné, sinon « client – projet – tâche »."""
+        if self.nom:
+            return self.nom
+        return " – ".join(t for t in (self.client, self.projet, self.tache) if t)
 
 
 class ConfigInvalide(Exception):
@@ -110,11 +149,18 @@ def _verifier_structure(donnees: dict) -> None:
     reglages = donnees.get("reglages", {})
     if not isinstance(reglages, dict):
         raise ConfigInvalide("[reglages] doit être une section.")
-    for nom in settings.REGLAGES_DEFAUT:
-        if nom in reglages:
-            valeur = reglages[nom]
-            if isinstance(valeur, bool) or not isinstance(valeur, int) or valeur <= 0:
-                raise ConfigInvalide(f"[reglages] {nom} doit être un nombre entier positif.")
+    for nom, defaut in settings.REGLAGES_DEFAUT.items():
+        if nom not in reglages:
+            continue
+        valeur = reglages[nom]
+        if isinstance(defaut, bool):
+            if not isinstance(valeur, bool):
+                raise ConfigInvalide(f"[reglages] {nom} doit valoir true ou false.")
+        elif nom in settings.REGLAGES_ZERO_PERMIS:
+            if isinstance(valeur, bool) or not isinstance(valeur, int) or valeur < 0:
+                raise ConfigInvalide(f"[reglages] {nom} doit être un nombre entier (0 ou plus).")
+        elif isinstance(valeur, bool) or not isinstance(valeur, int) or valeur <= 0:
+            raise ConfigInvalide(f"[reglages] {nom} doit être un nombre entier positif.")
 
     clients = donnees.get("clients", {})
     if not isinstance(clients, dict):
@@ -153,6 +199,34 @@ def _verifier_structure(donnees: dict) -> None:
     liste = communes.get("liste", [])
     if not isinstance(liste, list) or not all(isinstance(t, str) for t in liste):
         raise ConfigInvalide("[taches_communes] liste doit être une liste de textes.")
+
+    _verifier_raccourcis(donnees.get("raccourcis", []))
+
+
+def _verifier_raccourcis(raccourcis) -> None:
+    """Boutons rapides [[raccourcis]] : client obligatoire, le reste facultatif (textes)."""
+    if not isinstance(raccourcis, list) or not all(isinstance(r, dict) for r in raccourcis):
+        raise ConfigInvalide("Boutons rapides : écrire [[raccourcis]] (deux crochets), un bloc par bouton.")
+    if len(raccourcis) > settings.NOMBRE_MAX_RACCOURCIS:
+        raise ConfigInvalide(f"Boutons rapides : {settings.NOMBRE_MAX_RACCOURCIS} [[raccourcis]] au maximum "
+                             f"({len(raccourcis)} déclarés).")
+    for numero, raccourci in enumerate(raccourcis, start=1):
+        nom = f"Bouton rapide n° {numero}"
+        inconnues = [cle for cle in raccourci if cle not in CLES_RACCOURCI]
+        if inconnues:
+            raise ConfigInvalide(f"{nom} : clé inconnue « {inconnues[0]} » "
+                                 f"(autorisées : {', '.join(CLES_RACCOURCI)}).")
+        for cle, valeur in raccourci.items():
+            if not isinstance(valeur, str):
+                raise ConfigInvalide(f"{nom} : {cle} doit être un texte entre guillemets.")
+        if not raccourci.get("client", "").strip():
+            raise ConfigInvalide(f"{nom} : client obligatoire.")
+        if _cle(raccourci["client"]) == _cle(settings.CLIENT_PAUSE):
+            raise ConfigInvalide(f"{nom} : « {settings.CLIENT_PAUSE} » est réservé aux pauses.")
+        if _cle(raccourci.get("projet", "")) == CLE_VISIBLE:
+            raise ConfigInvalide(f"{nom} : « {CLE_VISIBLE} » ne peut pas être un nom de projet.")
+        if raccourci.get("tache", "").strip() and not raccourci.get("projet", "").strip():
+            raise ConfigInvalide(f"{nom} : une tâche demande un projet.")
 
 
 class Config:
@@ -207,7 +281,7 @@ class Config:
 
     # ─── Lecture ─────────────────────────────────────────────────────────────
 
-    def reglage(self, nom: str) -> int:
+    def reglage(self, nom: str) -> int | bool:
         """Valeur d'un réglage de [reglages], ou sa valeur par défaut."""
         reglages = self._donnees.get("reglages", {})
         if nom in reglages:
@@ -249,10 +323,44 @@ class Config:
         """Tâches proposées dans tous les projets."""
         return list(self._donnees.get("taches_communes", {}).get("liste", []))
 
+    def raccourcis(self) -> list[Raccourci]:
+        """Boutons rapides, dans l'ordre du fichier."""
+        liste = []
+        for r in self._donnees.get("raccourcis", []):
+            liste.append(Raccourci(**{cle: r.get(cle, "").strip() for cle in CLES_RACCOURCI}))
+        return liste
+
     # ─── Écriture ────────────────────────────────────────────────────────────
 
-    def ajouter(self, client: str, projet: str, tache: str | None = None) -> tuple[str, str, str | None]:
+    def modifier_reglage(self, nom: str, valeur: int | bool) -> None:
+        """Écrit un réglage dans [reglages] (choix fait dans l'appli, ex. « Masquer le journal »).
+
+        Commentaires et mise en forme conservés ; la ligne est ajoutée en fin de section
+        si elle n'existe pas. Lève ConfigInvalide si le fichier modifié à la main est illisible.
+        """
+        if nom not in settings.REGLAGES_DEFAUT:
+            raise KeyError(nom)
+        self.recharger_si_modifie()
+        if "reglages" not in self._doc:
+            self._doc.append("reglages", tomlkit.table())
+        table = self._doc["reglages"]
+        if nom in table:
+            if self._donnees.get("reglages", {}).get(nom) == valeur:
+                return
+            table[nom] = valeur
+        else:
+            fin = _retirer_fin(table)
+            table.append(nom, valeur)
+            for element in fin:
+                table.value.append(None, element)
+        self._sauvegarder()
+
+    def ajouter(self, client: str, projet: str, tache: str | None = None,
+                projet_obligatoire: bool = True) -> tuple[str, str, str | None]:
         """Enregistre client / projet / tâche s'ils n'existent pas encore.
+
+        projet_obligatoire = False : un projet vide est accepté (bouton rapide « client seul »,
+        bouton Modifier) ; seul le client est alors enregistré, sans tâche.
 
         - Un client ou un projet masqué (visible = false) reste masqué : on peut
           pointer dessus exceptionnellement sans le faire réapparaître (MP 2026-11-17).
@@ -268,7 +376,9 @@ class Config:
             tache = tache.strip()
         if tache == "":
             tache = None
-        if not client or not projet:
+        if not client:
+            raise ValueError("Le client est obligatoire.")
+        if not projet and projet_obligatoire:
             raise ValueError("Le client et le projet sont obligatoires.")
         if _cle(client) == _cle(settings.CLIENT_PAUSE):
             raise NomReserve(f"« {settings.CLIENT_PAUSE} » est réservé aux pauses.")
@@ -297,6 +407,11 @@ class Config:
             nom_client = client
             modifie = True
         table_client = clients[nom_client]
+
+        if not projet:
+            if modifie:
+                self._sauvegarder()
+            return nom_client, "", None
 
         nom_projet = _trouver(table_client, projet)
         if nom_projet is None:

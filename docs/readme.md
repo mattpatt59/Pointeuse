@@ -60,7 +60,11 @@ python3 -m venv .venv
 - [~] Étape 4 — icône + onglet « Pointer » + fenêtre d'absence (15 tests hors écran) ; validé sous Ubuntu/GNOME, reste Windows
 - [~] Étape 5 — onglet « Insérer / Journée » (`onglet_journee.py`) : insertion avec découpage, journée et totaux ; reste à valider sur poste réel
 - [~] Étape 6 — pause automatique (`absence.py`) : relevé d'horloge de secours, D-Bus sous Linux, messages de session sous Windows ; reste à valider sur poste réel
-- [~] Étape 7 — exécutable portable (`outils/construire.py`), lancement à l'ouverture de session (`demarrage_auto.py`), CI GitHub Actions ; exécutable Linux vérifié en local, reste Windows et le premier passage de la CI — 135 tests au total
+- [~] Étape 7 — exécutable portable (`outils/construire.py`), lancement à l'ouverture de session (`demarrage_auto.py`), CI GitHub Actions ; exécutable Linux vérifié en local, reste Windows et le premier passage de la CI
+- [~] Étape 8 — absence longue sans question, journal des événements (`evenements.py`), moments non pointés dans la vue Journée ; reste à valider sur poste réel
+- [~] Bilan : fusion de plusieurs fichiers autour d'un PC principal (`lecteur/fusion.js`, CDC `fusion.md`) ; pauses du principal tranchées (elles cèdent au travail du secondaire) ; reste à valider sur poste réel
+- [~] Onglet « Pointer » : Modifier, Stop, Repas, boutons rapides `[[raccourcis]]` (CDC `onglet_pointer.md`) ; reste à valider sur poste réel
+- [~] Onglet « À propos » : version, lien du dépôt GitHub, licences, présentation T-Elec — 220 tests au total
 
 ## Déploiement
 

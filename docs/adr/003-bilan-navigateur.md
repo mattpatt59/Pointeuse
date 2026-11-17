@@ -33,7 +33,7 @@ dépôt** pour le lecteur (pas de contrat à tenir entre deux dépôts).
 **Choix : lecteur livré avec l'appli, données en `.js` local.**
 
 - **Source unique** du lecteur : `src/pointeuse/lecteur/` (`index.html`, `pointeuse.css`,
-  `pointeuse.js`, `logo.png`), utilisé hors ligne : liens vers le
+  `fusion.js`, `pointeuse.js`, `logo.png`), utilisé hors ligne : liens vers le
   site en adresses absolues, logo dans le dossier.
 - Menu de l'icône « **Bilan** » (`bilan.py`) : copie le lecteur dans
   `<dossier du programme>/bilan/`, convertit le CSV en

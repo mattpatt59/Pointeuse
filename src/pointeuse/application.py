@@ -10,13 +10,14 @@ from PySide6.QtCore import QLockFile, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
-from pointeuse import demarrage_auto, settings
+from pointeuse import demarrage_auto, evenements, settings
 from pointeuse.bilan import CsvAbsent, preparer_bilan
 from pointeuse.absence import DetecteurAbsence, creer_sources
 from pointeuse.affichage import texte_info_bulle
 from pointeuse.chemins import DossierNonInscriptible, est_executable, chemin_config, dossier_programme, verifier_inscriptible
 from pointeuse.config import Config, ConfigInvalide
 from pointeuse.dialogue_absence import DialogueAbsence
+from pointeuse.evenements import JournalEvenements
 from pointeuse.icone import icone_etat
 from pointeuse.journal import Journal, a_la_minute
 from pointeuse.moteur import Moteur
@@ -30,6 +31,7 @@ class Application:
         self.qapp = qapp
         self.moteur = moteur
         self.bloque_signale = False
+        self.arret_note = False
 
         self.panneau = Panneau(moteur)
         self.panneau.pointer.etat_change.connect(self.mettre_a_jour)
@@ -65,11 +67,13 @@ class Application:
         self.minuteur_verification = QTimer(interval=settings.VERIFICATION_MIN * 60 * 1000)
         self.minuteur_verification.timeout.connect(self.verifier)
         qapp.aboutToQuit.connect(self.moteur.arreter)
+        qapp.aboutToQuit.connect(self._noter_arret)
 
         # Pause automatique (étape 6) : veille, session verrouillée.
         self.detecteur = DetecteurAbsence(lambda: moteur.config.reglage("detection_absence_min"))
         self.detecteur.absence_commencee.connect(self.moteur.absence_commencee)
         self.detecteur.absence_terminee.connect(self._retour_absence)
+        self.detecteur.evenement.connect(self._noter_evenement)
         self.sources_absence = creer_sources(self.detecteur)   # garder une référence
 
     def demarrer(self) -> None:
@@ -85,6 +89,11 @@ class Application:
                                     "« AppIndicator »).\nLa pointeuse s'ouvre en fenêtre ; la fermer arrête le pointage.")
         self.minuteur_affichage.start()
         self.minuteur_verification.start()
+
+        if self.moteur.evenements is not None:
+            maintenant = datetime.now()
+            self.moteur.evenements.purger(maintenant)
+            self.moteur.evenements.noter(evenements.DEMARRAGE, maintenant)
 
         absence = self.moteur.reprendre_apres_arret()
         if absence is not None and absence.duree_min > 0:
@@ -173,7 +182,18 @@ class Application:
         y = max(utile.top() + marge, min(y, utile.bottom() - taille.height() - marge))
         self.panneau.move(x, y)
 
-    # ─── Absence ─────────────────────────────────────────────────────────────
+    # ─── Absence et journal des événements ───────────────────────────────────
+
+    def _noter_evenement(self, nature: str, moment) -> None:
+        if self.moteur.evenements is not None:
+            self.moteur.evenements.noter(nature, moment)
+
+    def _noter_arret(self) -> None:
+        """Une seule fois : « Quitter » puis la fin de la boucle Qt appellent tous deux."""
+        if self.arret_note:
+            return
+        self.arret_note = True
+        self._noter_evenement(evenements.ARRET, datetime.now())
 
     def _retour_absence(self, fin) -> None:
         absence = self.moteur.absence_terminee(fin)
@@ -247,6 +267,7 @@ class Application:
 
     def quitter(self) -> None:
         self.moteur.arreter()
+        self._noter_arret()
         self.icone.hide()
         self.qapp.quit()
 
@@ -281,7 +302,10 @@ def main() -> int:
                              f"{erreur}\n\nCorrigez {settings.NOM_FICHIER_CONFIG} puis relancez la pointeuse.")
         return 1
 
-    moteur = Moteur(config, Journal(dossier / settings.NOM_FICHIER_CSV), dossier / settings.NOM_FICHIER_EN_COURS)
+    journal_evenements = JournalEvenements(dossier / settings.NOM_FICHIER_EVENEMENTS,
+                                           lambda: config.reglage("retention_journal_jours"))
+    moteur = Moteur(config, Journal(dossier / settings.NOM_FICHIER_CSV), dossier / settings.NOM_FICHIER_EN_COURS,
+                    evenements=journal_evenements)
     application = Application(qapp, moteur)
     application.demarrer()
     code = qapp.exec()

@@ -13,6 +13,9 @@
 [reglages]
 sauvegarde_min = 5          # fréquence de sauvegarde de la ligne en cours
 detection_absence_min = 2   # saut d'horloge considéré comme une veille
+absence_longue_h = 4        # absence plus longue (ou nuit) : pas de question au retour
+retention_journal_jours = 90  # journal des événements : durée de conservation (0 = pas de journal)
+afficher_journal = true     # vue Journée : événements et moments non pointés
 
 [clients."Alpha Industrie"]
 "Armoire ligne 2" = { taches = ["cdc", "schéma électrique", "câblage"] }
@@ -28,3 +31,16 @@ detection_absence_min = 2   # saut d'horloge considéré comme une veille
 # Tâches proposées dans tous les projets (facultatif, peut rester vide).
 [taches_communes]
 liste = ["réunion", "administratif", "support téléphone"]
+
+# Boutons rapides de l'onglet « Pointer » (facultatif, 8 au plus) : un clic démarre la tâche.
+# client obligatoire ; projet, tache, description facultatifs (pas de tâche sans projet) ;
+# nom = texte du bouton (par défaut « client – projet – tâche », coupé s'il est trop long).
+# Client seul : la tâche démarre sans projet (champ en rouge), à compléter avec « Modifier ».
+# Un client ou un projet inconnu est créé comme une saisie.
+# [[raccourcis]]
+# nom = "Alpha – Armoire"
+# client = "Alpha Industrie"
+# projet = "Armoire ligne 2"
+#
+# [[raccourcis]]
+# client = "Bêta Automatismes"

@@ -19,6 +19,7 @@ from typing import Callable
 
 from pointeuse import settings
 from pointeuse.config import Config
+from pointeuse.evenements import JournalEvenements
 from pointeuse.journal import Journal, JournalBloque, Ligne, a_la_minute, decouper
 
 VERSION_EN_COURS = 1
@@ -82,9 +83,11 @@ class Absence:
 class Moteur:
 
     def __init__(self, config: Config, journal: Journal, chemin_en_cours: Path,
-                 horloge: Callable[[], datetime] = datetime.now):
+                 horloge: Callable[[], datetime] = datetime.now,
+                 evenements: JournalEvenements | None = None):
         self.config = config
         self.journal = journal
+        self.evenements = evenements   # journal des événements du poste (vue Journée), facultatif
         self.chemin_en_cours = Path(chemin_en_cours)
         self.horloge = horloge
         self.ligne_ouverte: LigneOuverte | None = None
@@ -107,9 +110,14 @@ class Moteur:
 
     # ─── Actions de l'utilisateur ────────────────────────────────────────────
 
-    def demarrer(self, client: str, projet: str, tache: str | None = None, description: str = "") -> None:
-        """Démarre (ou change de) tâche. Les noms libres sont ajoutés à la config."""
-        client, projet, tache = self.config.ajouter(client, projet, tache)
+    def demarrer(self, client: str, projet: str, tache: str | None = None, description: str = "",
+                 projet_obligatoire: bool = True) -> None:
+        """Démarre (ou change de) tâche. Les noms libres sont ajoutés à la config.
+
+        projet_obligatoire = False : bouton rapide « client seul », le projet se complète
+        ensuite avec Modifier (le champ Projet est en rouge tant qu'il est vide).
+        """
+        client, projet, tache = self.config.ajouter(client, projet, tache, projet_obligatoire)
         if tache is None:
             tache = ""
         description = description.strip()
@@ -123,12 +131,20 @@ class Moteur:
         self.derniere_tache = self.ligne_ouverte
         self._ecrire_et_sauvegarder()
 
-    def pause(self) -> None:
+    def pause(self, description: str = "") -> None:
+        """Ouvre une pause (description : « Repas » pour le bouton Repas).
+
+        Déjà en pause : la pause continue ; une description donnée la remplace (Pause puis Repas).
+        """
+        description = description.strip()
         if self.en_pause:
+            if description and description != self.ligne_ouverte.description:
+                self.ligne_ouverte = replace(self.ligne_ouverte, description=description)
+                self.sauvegarder()
             return
         maintenant = self._maintenant()
         self._clore(maintenant)
-        self.ligne_ouverte = LigneOuverte(maintenant, settings.CLIENT_PAUSE)
+        self.ligne_ouverte = LigneOuverte(maintenant, settings.CLIENT_PAUSE, description=description)
         self._ecrire_et_sauvegarder()
 
     def reprendre(self) -> bool:
@@ -149,8 +165,25 @@ class Moteur:
         self.derniere_tache = self.ligne_ouverte
         self.sauvegarder()
 
+    def modifier(self, client: str, projet: str, tache: str | None = None, description: str = "") -> bool:
+        """Bouton Modifier : corrige la tâche en cours sans la couper (l'heure de début est gardée).
+
+        Projet vide accepté (il reste à compléter). Faux si aucune tâche n'est en cours.
+        Les noms libres sont ajoutés à la config, comme pour Démarrer.
+        """
+        if self.ligne_ouverte is None or self.ligne_ouverte.est_pause:
+            return False
+        client, projet, tache = self.config.ajouter(client, projet, tache, projet_obligatoire=False)
+        if tache is None:
+            tache = ""
+        self.ligne_ouverte = replace(self.ligne_ouverte, client=client, projet=projet, tache=tache,
+                                     description=description.strip())
+        self.derniere_tache = self.ligne_ouverte
+        self.sauvegarder()
+        return True
+
     def arreter(self) -> None:
-        """Fermeture du programme : la ligne en cours part dans le CSV.
+        """Bouton Stop, ou fermeture du programme : la ligne en cours part dans le CSV, rien ne suit.
 
         Arrêt du PC depuis l'écran de verrouillage : la ligne s'arrête au verrouillage.
         """
@@ -188,12 +221,21 @@ class Moteur:
         self.absence_debut = a_la_minute(debut)
         self.sauvegarder()
 
+    def absence_longue(self, debut: datetime, fin: datetime) -> bool:
+        """Absence qui passe un changement de jour ou dure au moins absence_longue_h : pas de question."""
+        if fin.date() != debut.date():
+            return True
+        return fin - debut >= timedelta(hours=self.config.reglage("absence_longue_h"))
+
     def absence_terminee(self, fin: datetime) -> Absence | None:
         """Retour : rend l'Absence à faire qualifier, ou None si rien à demander.
 
         Rien à demander si l'absence est plus courte que detection_absence_min (la tâche
         continue sans coupure), ou s'il n'y avait pas de tâche en cours (rien, ou pause :
         la pause continue).
+
+        Absence longue (nuit, ou au moins absence_longue_h) : rien à demander non plus, mais
+        la tâche ou la pause en cours est clôturée à l'heure du départ et rien ne redémarre.
         """
         debut = self.absence_debut
         if debut is None:
@@ -202,7 +244,14 @@ class Moteur:
         fin = a_la_minute(fin)
         ouverte = self.ligne_ouverte
         trop_court = (fin - debut).total_seconds() < self.config.reglage("detection_absence_min") * 60
-        if trop_court or ouverte is None or ouverte.est_pause or fin <= ouverte.debut:
+        if trop_court or ouverte is None or fin <= ouverte.debut:
+            self.sauvegarder()
+            return None
+        if self.absence_longue(debut, fin):
+            self._clore(max(debut, ouverte.debut))
+            self._ecrire_et_sauvegarder()
+            return None
+        if ouverte.est_pause:
             self.sauvegarder()
             return None
         debut = max(debut, ouverte.debut)
@@ -312,7 +361,8 @@ class Moteur:
         """Au démarrage : récupère l'état laissé par la session précédente.
 
         Si une ligne était ouverte (plantage, coupure), elle est écrite jusqu'à
-        la dernière sauvegarde et l'Absence qui suit est rendue à l'interface.
+        la dernière sauvegarde et l'Absence qui suit est rendue à l'interface
+        (sauf absence longue : rien à demander).
         """
         etat = self._lire_etat()
         absence = None
@@ -332,7 +382,8 @@ class Moteur:
                 if ligne.duree_min > 0:
                     self.en_attente.append(ligne)
                 maintenant = self._maintenant()
-                if maintenant > arret:
+                # Trou long (nuit, ou au moins absence_longue_h) : pas de question, comme après une veille.
+                if maintenant > arret and not self.absence_longue(arret, maintenant):
                     absence = Absence(arret, maintenant, ouverte)
         self.ligne_ouverte = None
         self.absence_debut = None

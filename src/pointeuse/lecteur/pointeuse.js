@@ -16,6 +16,12 @@ const CFG = {
     cleReglages:      't-elec-pointeuse-reglages',   // localStorage : réglages seulement, jamais les pointages
     toastMs:          3500,
 
+    // Fusion de plusieurs fichiers (CDC fusion.md) — format de sortie = pointeuse.csv (settings.py)
+    colonnesCsv:      ['date_in', 'date_out', 'client', 'projet', 'tache', 'description', 'duree_min'],
+    fusionPauseCede:  true,      // une pause du PC principal laisse la place au travail du secondaire
+    nomFusion:        'pointeuse_fusion.csv',
+    nomRapport:       'fusion_rapport.csv',
+
     // Couleurs des clients — ordre fixe validé daltonisme (écart voisins ≥ 10, vision normale ≥ 19,6).
     // Attribuées par temps total sur tout le fichier : un client garde sa couleur quand on filtre.
     palette:          ['#70AD47', '#e87ba4', '#eda100', '#e34948', '#2a78d6', '#eb6834', '#6250d6', '#1baf7a'],
@@ -58,7 +64,9 @@ const PERIODES = [
    ÉTAT
 ═══════════════════════════════════════ */
 let pointages = [];      // { debut, fin, client, projet, tache, description, recherche }
-let fichiers = [];       // { nom, lignes, erreurs: [] }
+let fichiers = [];       // { nom, lignes, erreurs: [], pointages } — dans l'ordre de chargement
+let principal = 0;       // index du PC principal dans fichiers (plusieurs fichiers : fusion)
+let fusion = null;       // { retires: [{ ligne, recouvertPar, fichier }], doublons: [] } si plusieurs fichiers
 let couleurs = new Map();  // client → couleur ; absent = « Autres »
 const masques = new Set(); // clients décochés
 let recherche = '';
@@ -271,14 +279,12 @@ function analyserCsv(texte) {
     return resultat;
 }
 
-function clePointage(p) {
-    return [p.debut.getTime(), p.fin.getTime(), p.client, p.projet, p.tache, p.description].join('\u0001');
-}
-
-/** Remplace les données par celles des fichiers donnés (fusionnés, doublons exacts retirés). */
-function chargerTextes(entrees) {
-    const vus = new Set();
-    const tous = [];
+/**
+ * Lit les fichiers donnés (doublons exacts d'un même fichier retirés).
+ * ajouter = false : ils remplacent les données ; true : ils s'ajoutent (« Ajouter un autre PC »).
+ * Plusieurs fichiers : fusion, le PC principal l'emporte (fusion.js, CDC fusion.md).
+ */
+function chargerTextes(entrees, ajouter) {
     const lus = [];
     for (const { nom, texte } of entrees) {
         let res;
@@ -288,21 +294,25 @@ function chargerTextes(entrees) {
             toast(nom + ' : ' + e.message, true);
             continue;
         }
-        let ajoutes = 0;
+        const vus = new Set();
+        const lignes = [];
         for (const p of res.pointages) {
-            const cle = clePointage(p);
+            const cle = fusionCle(p);
             if (vus.has(cle)) continue;
             vus.add(cle);
-            tous.push(p);
-            ajoutes++;
+            lignes.push(p);
         }
-        lus.push({ nom, lignes: ajoutes, erreurs: res.erreurs });
+        lus.push({ nom, lignes: lignes.length, erreurs: res.erreurs, pointages: lignes });
     }
     if (lus.length === 0) return;
 
-    tous.sort((a, b) => a.debut - b.debut);
-    pointages = tous;
-    fichiers = lus;
+    if (ajouter) {
+        fichiers = fichiers.concat(lus);
+    } else {
+        fichiers = lus;
+        principal = 0;   // ouvert depuis la Pointeuse : son CSV est chargé en premier
+    }
+    fusionnerFichiersCharges();
     masques.clear();
     recherche = '';
     attribuerCouleurs();
@@ -315,14 +325,31 @@ function chargerTextes(entrees) {
     toutAfficher();
 }
 
-function lireFichiers(liste) {
+/** pointages ← fichier unique, ou fusion des fichiers chargés autour du PC principal. */
+function fusionnerFichiersCharges() {
+    fusion = null;
+    if (fichiers.length === 0) {
+        pointages = [];
+        return;
+    }
+    if (fichiers.length === 1) {
+        pointages = fichiers[0].pointages.slice().sort((a, b) => a.debut - b.debut);
+        return;
+    }
+    const r = fusionnerFichiers(fichiers.map(f => f.pointages), principal,
+                                { clientPause: CFG.clientPause, pauseCede: CFG.fusionPauseCede });
+    pointages = r.pointages;
+    fusion = { retires: r.retires, doublons: r.doublons };
+}
+
+function lireFichiers(liste, ajouter) {
     const csv = Array.from(liste).filter(f => /\.(csv|txt)$/i.test(f.name) || f.type === 'text/csv');
     if (csv.length === 0) {
         toast('Choisissez un fichier .csv (pointeuse.csv).', true);
         return;
     }
     Promise.all(csv.map(f => f.text().then(texte => ({ nom: f.name, texte }))))
-        .then(chargerTextes)
+        .then(entrees => chargerTextes(entrees, ajouter))
         .catch(() => toast('Lecture du fichier impossible.', true));
 }
 
@@ -794,7 +821,8 @@ function renderVide() {
             <button type="button" class="btn btn--sec" data-action="exemple">Voir un exemple</button>
         </div>
         <p class="bilan-vide__note">Le fichier se trouve à côté du programme Pointeuse (menu de l'icône → « Ouvrir le CSV »).
-            Vous pouvez aussi le glisser sur cette page. Plusieurs fichiers (plusieurs postes) sont additionnés.</p>
+            Vous pouvez aussi le glisser sur cette page. Plusieurs fichiers (plusieurs postes) sont fusionnés :
+            le PC principal l'emporte, on ne compte pas deux fois le même moment.</p>
     </div>`;
 }
 
@@ -811,6 +839,7 @@ function renderBilan(r) {
     if (masques.size > 0 || recherche.trim()) filtreActif = ' · filtres actifs';
 
     $('#bilan').innerHTML = `
+        ${htmlFusion()}
         <div class="bilan-entete">
             <h2>${titrePeriode(r)}</h2>
             <span class="bilan-entete__info">${pointages.length} pointage(s) lu(s)${filtreActif}</span>
@@ -865,8 +894,56 @@ function htmlClients(r) {
     }).join('') + '</div>';
 }
 
+/** Minutes de travail retirées à chaque fichier par la fusion. */
+function minutesRetirees() {
+    const parFichier = fichiers.map(() => 0);
+    if (!fusion) return parFichier;
+    for (const x of fusion.retires) parFichier[x.fichier] += (x.ligne.fin - x.ligne.debut) / 60000;
+    return parFichier;
+}
+
+/** Bandeau : temps retirés du (des) PC secondaire(s), avec le détail (CDC fusion.md). */
+function htmlFusion() {
+    if (!fusion || fusion.retires.length === 0) return '';
+    const parFichier = minutesRetirees();
+    const total = parFichier.reduce((a, b) => a + b, 0);
+    const secondaires = [];
+    parFichier.forEach((minutes, i) => {
+        if (minutes > 0) secondaires.push(esc(fichiers[i].nom));
+    });
+    let colonneFichier = '';
+    if (fichiers.length > 2) colonneFichier = '<th>Fichier</th>';
+    const rangs = fusion.retires.slice(0, CFG.lignesAffichees).map(x => {
+        const p = x.ligne;
+        let celluleFichier = '';
+        if (fichiers.length > 2) celluleFichier = `<td>${esc(fichiers[x.fichier].nom)}</td>`;
+        return `<tr><td>${texteJour(p.debut)}</td><td>${texteHeure(p.debut)} → ${texteHeure(p.fin)}</td>` +
+            `${celluleFichier}<td>${nomOuVide(fusionLibelle(p), 'sans client')}</td>` +
+            `<td class="nb">${hmin((p.fin - p.debut) / 60000)}</td><td>${esc(x.recouvertPar)}</td></tr>`;
+    }).join('');
+    let suite = '';
+    if (fusion.retires.length > CFG.lignesAffichees) {
+        suite = `<p class="cfg-note">${CFG.lignesAffichees} premières plages sur ${fusion.retires.length} : le rapport les contient toutes.</p>`;
+    }
+    return `<div class="al-warn fusion" role="alert">
+        <details>
+            <summary><b>⚠ Temps retirés du PC secondaire (${secondaires.join(', ')}) : ${hmin(total)}</b>
+                — ${fusion.retires.length} plage(s) déjà pointée(s) sur le PC principal (${esc(fichiers[principal].nom)}).
+                On ne peut pas être à deux endroits à la fois.</summary>
+            <div class="table-defile"><table class="table">
+                <thead><tr><th>Date</th><th>Heures</th>${colonneFichier}<th>Retiré</th><th class="nb">Durée</th><th>Recouvert par</th></tr></thead>
+                <tbody>${rangs}</tbody>
+            </table></div>
+            ${suite}
+        </details>
+        <button type="button" class="btn btn--sec" data-action="rapport">Exporter le rapport</button>
+    </div>`;
+}
+
 function htmlFichiers() {
-    return fichiers.map(f => {
+    const plusieurs = fichiers.length > 1;
+    const retirees = minutesRetirees();
+    return fichiers.map((f, i) => {
         let erreurs = '';
         if (f.erreurs.length > 0) {
             const visibles = f.erreurs.slice(0, CFG.erreursAffichees).map(e => `<li>${esc(e)}</li>`).join('');
@@ -874,8 +951,31 @@ function htmlFichiers() {
             if (f.erreurs.length > CFG.erreursAffichees) suite = `<li>… et ${f.erreurs.length - CFG.erreursAffichees} autre(s)</li>`;
             erreurs = `<ul class="fichier__erreurs">${visibles}${suite}</ul>`;
         }
-        return `<div class="fichier"><b>${esc(f.nom)}</b> — ${f.lignes} ligne(s)${erreurs}</div>`;
+        let fusionTexte = '';
+        if (retirees[i] > 0) fusionTexte += ` · <span class="fichier__retire">${hmin(retirees[i])} retirées</span>`;
+        if (fusion && fusion.doublons[i] > 0) fusionTexte += ` · ${fusion.doublons[i]} ligne(s) déjà dans le principal`;
+        let choix = '';
+        if (plusieurs) {
+            let coche = '';
+            if (i === principal) coche = ' checked';
+            choix = `<label class="fichier__principal"><input type="radio" name="principal" value="${i}"${coche}> PC principal</label>`;
+        }
+        return `<div class="fichier"><b>${esc(f.nom)}</b> — ${f.lignes} ligne(s)${fusionTexte}${choix}${erreurs}</div>`;
     }).join('');
+}
+
+function htmlActionsFichiers() {
+    let fusionner = '';
+    if (fichiers.length > 1) {
+        fusionner = `<button type="button" class="btn-lien" data-action="csv-fusion">Télécharger le CSV fusionné</button>
+            <p class="cfg-note">Fichiers d'origine non modifiés. Pour garder la fusion : fermer la Pointeuse,
+                remplacer <code>pointeuse.csv</code> par <code>${CFG.nomFusion}</code>, relancer.</p>`;
+    }
+    return `<div class="fichiers__actions">
+            <label class="btn-lien" title="pointeuse.csv d'un autre poste : fusionné avec le PC principal">＋ Ajouter un autre PC
+                <input type="file" accept=".csv,text/csv" multiple hidden data-ajout></label>
+            ${fusionner}
+        </div>`;
 }
 
 function noteFichiers() {
@@ -926,6 +1026,7 @@ function renderConfig(r) {
         </section>
         <section class="cfg-section"><h2>Fichiers lus <button type="button" class="btn-lien" data-action="fermer">Fermer</button></h2>
             ${htmlFichiers()}
+            ${htmlActionsFichiers()}
             <p class="cfg-note">${noteFichiers()}</p>
         </section>`;
 }
@@ -975,6 +1076,37 @@ function exporter() {
     rangs.push(['Total', '', '', Math.round(r.travail), heuresDecimales(r.travail)]);
     const texte = '﻿' + rangs.map(rang => rang.map(champCsv).join(';')).join('\r\n') + '\r\n';
     telecharger(texte, 'pointeuse_bilan_' + cleJour(r.du) + '_' + cleJour(r.au) + '.csv', 'text/csv;charset=utf-8');
+}
+
+/** Ligne au format exact de pointeuse.csv. */
+function texteDateCsv(d) {
+    return d.getFullYear() + '-' + deux(d.getMonth() + 1) + '-' + deux(d.getDate()) + ' ' + texteHeure(d);
+}
+
+function rangPointage(p) {
+    return [texteDateCsv(p.debut), texteDateCsv(p.fin), p.client, p.projet, p.tache, p.description,
+            Math.round((p.fin - p.debut) / 60000)];
+}
+
+/** UTF-8 avec BOM, « ; », fins de ligne CRLF : comme la Pointeuse. */
+function texteCsv(rangs) {
+    return '\uFEFF' + rangs.map(rang => rang.map(champCsv).join(';')).join('\r\n') + '\r\n';
+}
+
+function exporterFusion() {
+    if (fichiers.length < 2) return;
+    const rangs = [CFG.colonnesCsv].concat(pointages.map(rangPointage));
+    telecharger(texteCsv(rangs), CFG.nomFusion, 'text/csv;charset=utf-8');
+}
+
+/** fusion_rapport.csv : colonnes du CSV + fichier d'où le temps est retiré + ce qui le recouvre. */
+function exporterRapport() {
+    if (!fusion) return;
+    const rangs = [CFG.colonnesCsv.concat(['fichier', 'recouvert_par'])];
+    for (const x of fusion.retires) {
+        rangs.push(rangPointage(x.ligne).concat([fichiers[x.fichier].nom, x.recouvertPar]));
+    }
+    telecharger(texteCsv(rangs), CFG.nomRapport, 'text/csv;charset=utf-8');
 }
 
 /* ═══════════════════════════════════════
@@ -1070,9 +1202,11 @@ function chargerReglages() {
 ═══════════════════════════════════════ */
 function surAction(action) {
     if (action === 'exemple') {
-        chargerTextes([{ nom: 'exemple (pointages fictifs)', texte: csvExemple() }]);
+        chargerTextes([{ nom: 'exemple (pointages fictifs)', texte: csvExemple() }], false);
         return;
     }
+    if (action === 'rapport') exporterRapport();
+    if (action === 'csv-fusion') exporterFusion();
     if (action === 'precedent') decaler(-1);
     if (action === 'suivant') decaler(1);
     if (action === 'tous') {
@@ -1086,6 +1220,8 @@ function surAction(action) {
     if (action === 'fermer') {
         pointages = [];
         fichiers = [];
+        principal = 0;
+        fusion = null;
         masques.clear();
         recherche = '';
         toutAfficher();
@@ -1109,8 +1245,15 @@ function brancher() {
     document.addEventListener('change', ev => {
         const cible = ev.target;
         if (cible.id === 'fichier' || cible.hasAttribute('data-fichier')) {
-            lireFichiers(cible.files);
+            lireFichiers(cible.files, false);
             cible.value = '';
+        } else if (cible.hasAttribute('data-ajout')) {
+            lireFichiers(cible.files, true);
+            cible.value = '';
+        } else if (cible.name === 'principal') {
+            principal = Number(cible.value);
+            fusionnerFichiersCharges();
+            toutAfficher();
         } else if (cible.id === 'periode') {
             reglages.periode = cible.value;
             if (cible.value === 'perso') {
@@ -1175,7 +1318,7 @@ function brancher() {
         ev.preventDefault();
         profondeur = 0;
         $('#depot').hidden = true;
-        lireFichiers(ev.dataTransfer.files);
+        lireFichiers(ev.dataTransfer.files, false);
     });
 
     let attente = null;
@@ -1194,7 +1337,7 @@ toutAfficher();
 const DONNEES_LOCALES_VERSION = 1;
 const donneesLocales = window.POINTEUSE_CSV;
 if (donneesLocales && donneesLocales.version === DONNEES_LOCALES_VERSION && typeof donneesLocales.texte === 'string') {
-    chargerTextes([{ nom: String(donneesLocales.nom || 'pointeuse.csv'), texte: donneesLocales.texte }]);
+    chargerTextes([{ nom: String(donneesLocales.nom || 'pointeuse.csv'), texte: donneesLocales.texte }], false);
 } else if (donneesLocales) {
     toast('Données de la Pointeuse dans un format inconnu : lisez le CSV avec « Lire un CSV ».', true);
 }

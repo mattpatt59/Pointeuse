@@ -83,7 +83,17 @@ def feuille_de_style() -> str:
     QPushButton#primaire:hover {{ background: {s.COULEUR_VERT_FONCE}; }}
     QPushButton#pause {{ background: {s.COULEUR_ORANGE}; }}
     QPushButton#reprendre {{ background: {s.COULEUR_VERT_FONCE}; }}
-    QPushButton:disabled {{ background: {s.COULEUR_BORDURE}; color: {s.COULEUR_GRIS}; }}
+    QPushButton#stop {{ background: {s.COULEUR_BOUTON_SUPPRIMER}; }}
+    /* Boutons rapides [[raccourcis]] : discrets, vert clair (charte §E Tags) */
+    QPushButton#raccourci {{ background: {s.COULEUR_VERT_CLAIR}; color: {s.COULEUR_VERT_PROFOND};
+                             border: 1px solid {s.COULEUR_VERT_FONCE}; padding: 7px 14px; text-align: left; }}
+    QPushButton#raccourci:hover {{ background: {s.COULEUR_VERT}; color: {s.COULEUR_BLANC}; }}
+    QLabel#titre_raccourcis {{ color: {s.COULEUR_VERT_PROFOND}; font-weight: bold; padding-top: 6px;
+                               border-top: 1px solid {s.COULEUR_BORDURE}; }}
+    QPushButton:disabled {{ background: {s.COULEUR_BORDURE}; color: {s.COULEUR_GRIS}; border: none; }}
+
+    /* Tâche lancée sans projet (bouton rapide « client seul ») : projet à compléter */
+    QComboBox[a_completer="true"] {{ border: 2px solid {s.COULEUR_ROUGE}; background: {s.COULEUR_ROUGE_CLAIR}; }}
 
     QCheckBox, QRadioButton {{ color: {s.COULEUR_GRIS}; }}
 
@@ -93,6 +103,7 @@ def feuille_de_style() -> str:
     QTreeWidget {{ border: 1px solid {s.COULEUR_BORDURE_TABLE}; border-radius: 6px; }}
     QHeaderView::section {{ background: {s.COULEUR_ENTETE_TABLE}; color: {s.COULEUR_VERT_PROFOND};
                             font-weight: bold; border: none; padding: 4px 6px; }}
+    QLabel#a_propos {{ color: {s.COULEUR_NOIR}; padding-top: 10px; border-top: 1px solid {s.COULEUR_BORDURE}; }}
     QLabel#totaux {{ font-weight: bold; color: {s.COULEUR_VERT_PROFOND}; }}
     QRadioButton {{ font-weight: bold; color: {s.COULEUR_NOIR}; }}
     """

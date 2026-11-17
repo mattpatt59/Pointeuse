@@ -1,23 +1,31 @@
-"""Onglet « Insérer / Journée » (CDC étape 5).
+"""Onglet « Insérer / Journée » (CDC étapes 5 et 8).
 
 En haut : insérer une tâche à heures fixes (oubli de pointage, réunion notée après coup).
-En bas : les lignes du jour choisi et ses totaux, ligne en cours comprise.
+En bas : les lignes du jour choisi et ses totaux, ligne en cours comprise ; entre les
+lignes, les événements du poste et les moments non pointés (journal des événements).
+Un clic sur un moment non pointé remplit la plage à insérer.
 """
 
 from datetime import date, datetime, time, timedelta
 
 from PySide6.QtCore import QDate, QTime, Qt, Signal
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QDateEdit, QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPushButton,
-                               QTimeEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QDateEdit, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
+                               QPushButton, QTimeEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from pointeuse import settings
 from pointeuse.affichage import (duree_texte, libelle_ligne, minutes_dans_le_jour, texte_plage,
                                  totaux_du_jour)
 from pointeuse.config import ConfigInvalide
+from pointeuse.evenements import trous_du_jour
 from pointeuse.formulaire import FormulaireTache, _etiquette
 from pointeuse.journal import JournalBloque, a_la_minute
 from pointeuse.moteur import Moteur
+
+# Ordre d'affichage à heure égale : l'événement, puis la ligne pointée, puis le moment non pointé.
+ORDRE_EVENEMENT = 0
+ORDRE_LIGNE = 1
+ORDRE_TROU = 2
 
 
 class OngletJournee(QWidget):
@@ -59,7 +67,11 @@ class OngletJournee(QWidget):
         entete.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         entete.setSectionResizeMode(1, QHeaderView.Stretch)
         entete.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.lignes.itemClicked.connect(self._choisir_trou)
         self.totaux = QLabel(objectName="totaux")
+        self.masquer_journal = QCheckBox("Masquer le journal")
+        self.masquer_journal.setToolTip("Événements du poste (déverrouillage…) et moments non pointés")
+        self.masquer_journal.toggled.connect(self._changer_masquage)
 
         disposition = QVBoxLayout(self)
         disposition.setContentsMargins(16, 16, 16, 16)
@@ -70,6 +82,7 @@ class OngletJournee(QWidget):
         disposition.addWidget(self.titre)
         disposition.addWidget(self.lignes, 1)
         disposition.addWidget(self.totaux)
+        disposition.addWidget(self.masquer_journal)
 
         self.date.dateChanged.connect(self.rafraichir)
         self.reinitialiser_plage()
@@ -94,20 +107,24 @@ class OngletJournee(QWidget):
         self.fin.setTime(QTime(maintenant.hour, maintenant.minute))
         self.rafraichir()
 
+    def journal_visible(self) -> bool:
+        evenements = self.moteur.evenements
+        return evenements is not None and evenements.actif and self.moteur.config.reglage("afficher_journal")
+
     def rafraichir(self, *_) -> None:
         jour = self.jour()
         maintenant = self.horloge()
         self.titre.setText(f"Journée du {jour:%d/%m/%Y}")
         lignes = self.moteur.lignes_du_jour(jour)
+        entrees = []   # (heure, ordre, élément) : triées avant affichage
 
-        self.lignes.clear()
         for ligne in lignes:
             minutes = minutes_dans_le_jour(ligne.debut, ligne.fin, jour)
             element = QTreeWidgetItem([texte_plage(ligne.debut, ligne.fin, jour),
                                        libelle_ligne(ligne.client, ligne.projet, ligne.tache),
                                        duree_texte(minutes)])
             self._mettre_en_forme(element, ligne.est_pause, ligne.description)
-            self.lignes.addTopLevelItem(element)
+            entrees.append((ligne.debut, ORDRE_LIGNE, element))
 
         ouverte = self.moteur.ligne_ouverte
         if ouverte is not None and ouverte.debut.date() <= jour <= maintenant.date():
@@ -119,12 +136,80 @@ class OngletJournee(QWidget):
             police.setItalic(True)
             for colonne in range(3):
                 element.setFont(colonne, police)
-            self.lignes.addTopLevelItem(element)
+            entrees.append((ouverte.debut, ORDRE_LIGNE, element))
+            ouverte_du_jour = ouverte
         else:
-            ouverte = None
+            ouverte_du_jour = None
 
-        travail, pause = totaux_du_jour(lignes, ouverte, maintenant, jour)
+        self._rafraichir_case_journal()
+        if self.journal_visible():
+            entrees.extend(self._entrees_journal(jour, lignes, maintenant))
+
+        self.lignes.clear()
+        for _, _, element in sorted(entrees, key=lambda e: (e[0], e[1])):
+            self.lignes.addTopLevelItem(element)
+
+        travail, pause = totaux_du_jour(lignes, ouverte_du_jour, maintenant, jour)
         self.totaux.setText(f"Travaillé : {duree_texte(travail)}      Pause : {duree_texte(pause)}")
+
+    def _entrees_journal(self, jour: date, lignes, maintenant: datetime) -> list:
+        """Événements du jour (en gris) et moments non pointés (cliquables)."""
+        tous = self.moteur.evenements.lire()
+        entrees = []
+        for evenement in tous:
+            if evenement.moment.date() != jour:
+                continue
+            element = QTreeWidgetItem([f"{evenement.moment:%H:%M}", "◦ " + evenement.libelle, ""])
+            for colonne in range(3):
+                element.setForeground(colonne, QColor(settings.COULEUR_GRIS))
+            entrees.append((evenement.moment, ORDRE_EVENEMENT, element))
+
+        occupees = [(ligne.debut, ligne.fin) for ligne in lignes]
+        ouverte = self.moteur.ligne_ouverte
+        if ouverte is not None:
+            occupees.append((ouverte.debut, maintenant))
+        # Les événements des jours précédents comptent : on peut être déverrouillé depuis la veille.
+        precedents = [e for e in tous if e.moment.date() <= jour]
+        for debut, fin in trous_du_jour(precedents, occupees, jour, maintenant, settings.TROU_MIN_AFFICHE_MIN):
+            minutes = minutes_dans_le_jour(debut, fin, jour)
+            element = QTreeWidgetItem([texte_plage(debut, fin, jour), "▒ non pointé — cliquer pour insérer",
+                                       duree_texte(minutes)])
+            element.setData(0, Qt.UserRole, (debut, fin))
+            element.setTextAlignment(2, Qt.AlignRight | Qt.AlignVCenter)
+            element.setToolTip(1, "PC utilisé, rien de pointé : un clic remplit la plage à insérer.")
+            for colonne in range(3):
+                element.setForeground(colonne, QColor(settings.COULEUR_ORANGE))
+                element.setBackground(colonne, QColor(settings.COULEUR_ORANGE_CLAIR))
+            entrees.append((debut, ORDRE_TROU, element))
+        return entrees
+
+    def _rafraichir_case_journal(self) -> None:
+        """La case suit la config (modifiable à la main) ; cachée si le journal est désactivé."""
+        evenements = self.moteur.evenements
+        self.masquer_journal.setVisible(evenements is not None and evenements.actif)
+        self.masquer_journal.blockSignals(True)
+        self.masquer_journal.setChecked(not self.moteur.config.reglage("afficher_journal"))
+        self.masquer_journal.blockSignals(False)
+
+    def _changer_masquage(self, masquer: bool) -> None:
+        try:
+            self.moteur.config.modifier_reglage("afficher_journal", not masquer)
+        except (ConfigInvalide, OSError) as erreur:
+            QMessageBox.warning(self, settings.NOM_APPLICATION, str(erreur))
+        self.rafraichir()
+
+    def _choisir_trou(self, element: QTreeWidgetItem, _colonne: int = 0) -> None:
+        """Clic sur un moment non pointé : il devient la plage à insérer."""
+        plage = element.data(0, Qt.UserRole)
+        if not plage:
+            return
+        debut, fin = plage
+        self.debut.setTime(QTime(debut.hour, debut.minute))
+        if fin.date() > debut.date():
+            self.fin.setTime(QTime(23, 59))   # moment qui va jusqu'à minuit
+        else:
+            self.fin.setTime(QTime(fin.hour, fin.minute))
+        self.formulaire.client.setFocus()
 
     @staticmethod
     def _mettre_en_forme(element: QTreeWidgetItem, est_pause: bool, description: str) -> None:

@@ -19,17 +19,30 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot, SLOT
 
-from pointeuse import settings
+from pointeuse import evenements, settings
 
 RAISON_VERROU = "verrouillage"
 RAISON_VEILLE = "veille"
 
+# (raison, actif) → nature de l'événement noté dans le journal des événements
+NATURES = {
+    (RAISON_VERROU, True): evenements.VERROUILLAGE,
+    (RAISON_VERROU, False): evenements.DEVERROUILLAGE,
+    (RAISON_VEILLE, True): evenements.VEILLE,
+    (RAISON_VEILLE, False): evenements.REVEIL,
+}
+
 
 class DetecteurAbsence(QObject):
-    """Émet absence_commencee(debut) puis absence_terminee(fin), en datetime local."""
+    """Émet absence_commencee(debut) puis absence_terminee(fin), en datetime local.
+
+    Émet aussi evenement(nature, moment) pour chaque verrouillage / déverrouillage /
+    veille / réveil, même pendant la fenêtre « retour d'absence » (journal des événements).
+    """
 
     absence_commencee = Signal(object)
     absence_terminee = Signal(object)
+    evenement = Signal(str, object)
 
     def __init__(self, seuil_min: Callable[[], int], horloge: Callable[[], datetime] = datetime.now,
                  epoque: Callable[[], float] = time.time, parent=None):
@@ -55,9 +68,11 @@ class DetecteurAbsence(QObject):
 
     def signaler(self, raison: str, actif: bool) -> None:
         """Appelé par les sources OS : verrouillage / veille qui commence ou finit."""
+        maintenant = self.horloge()
+        if (raison, actif) in NATURES:
+            self.evenement.emit(NATURES[(raison, actif)], maintenant)
         if self.suspendu:
             return
-        maintenant = self.horloge()
         if actif:
             deja = self.en_absence
             self.raisons.add(raison)
@@ -77,6 +92,8 @@ class DetecteurAbsence(QObject):
         if precedent is None or self.suspendu or self.en_absence:
             return   # une absence signalée par l'OS est déjà en cours : on attend sa fin
         if epoque - precedent[0] >= self.seuil_min() * 60:
+            self.evenement.emit(evenements.VEILLE, precedent[1])
+            self.evenement.emit(evenements.REVEIL, maintenant)
             self.absence_commencee.emit(precedent[1])
             self.absence_terminee.emit(maintenant)
 

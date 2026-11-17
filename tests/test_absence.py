@@ -108,6 +108,41 @@ def test_suspendu_pendant_la_fenetre_d_absence(detecteur, temps):
     assert not detecteur.en_absence
 
 
+
+def suivre_journal(detecteur) -> list:
+    notes = []
+    detecteur.evenement.connect(lambda nature, moment: notes.append((nature, moment.strftime("%H:%M"))))
+    return notes
+
+
+def test_evenements_du_poste_notes(detecteur, temps):
+    notes = suivre_journal(detecteur)
+    detecteur.signaler(RAISON_VERROU, True)
+    temps.avancer(30)
+    detecteur.relever()
+    detecteur.signaler(RAISON_VERROU, False)
+    detecteur.signaler(RAISON_VEILLE, True)
+    detecteur.signaler(RAISON_VEILLE, False)
+    assert notes == [("verrouillage", "10:00"), ("deverrouillage", "10:30"),
+                     ("veille", "10:30"), ("reveil", "10:30")]
+
+
+def test_evenements_notes_meme_suspendu(detecteur, temps):
+    """Fenêtre d'absence ouverte : pas de nouvelle question, mais le journal suit."""
+    notes = suivre_journal(detecteur)
+    detecteur.suspendre(True)
+    detecteur.signaler(RAISON_VERROU, True)
+    assert notes == [("verrouillage", "10:00")]
+
+
+def test_saut_d_horloge_note_veille_et_reveil(detecteur, temps):
+    notes = suivre_journal(detecteur)
+    temps.avancer(0.5)
+    detecteur.relever()
+    temps.avancer(45)
+    detecteur.relever()
+    assert notes == [("veille", "10:00"), ("reveil", "10:45")]
+
 @pytest.mark.parametrize("message, wparam, attendu", [
     (WM_WTSSESSION_CHANGE, WTS_SESSION_LOCK, (RAISON_VERROU, True)),
     (WM_WTSSESSION_CHANGE, WTS_SESSION_UNLOCK, (RAISON_VERROU, False)),
@@ -191,3 +226,58 @@ def test_arret_du_pc_depuis_l_ecran_verrouille(moteur, horloge):
     horloge.regler("18:30")
     moteur.arreter()
     assert resume(moteur) == [("08:00", "17:00", "Alpha Industrie", "Armoire ligne 2", "", "")]
+
+
+# ─── Absence longue : pas de question (CDC « Pause automatique ») ────────────
+
+def test_nuit_tache_close_au_verrouillage(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    moteur.absence_commencee(a("18:00"))
+    lendemain = datetime(2026, 11, 18, 8, 30)
+    horloge.moment = lendemain
+    assert moteur.absence_terminee(lendemain) is None
+    assert resume(moteur) == [("08:00", "18:00", "Alpha Industrie", "Armoire ligne 2", "", "")]
+    assert moteur.ligne_ouverte is None
+    assert moteur.absence_debut is None
+
+
+def test_absence_de_4_h_meme_jour_sans_question(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    moteur.absence_commencee(a("10:00"))
+    horloge.regler("14:00")
+    assert moteur.absence_terminee(a("14:00")) is None
+    assert resume(moteur) == [("08:00", "10:00", "Alpha Industrie", "Armoire ligne 2", "", "")]
+    assert moteur.ligne_ouverte is None
+
+
+def test_absence_de_moins_de_4_h_question(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    moteur.absence_commencee(a("10:00"))
+    horloge.regler("13:59")
+    assert moteur.absence_terminee(a("13:59")) is not None
+
+
+def test_pause_close_au_verrouillage_le_soir(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("17:00")
+    moteur.pause()
+    moteur.absence_commencee(a("17:30"))
+    lendemain = datetime(2026, 11, 18, 8, 30)
+    horloge.moment = lendemain
+    assert moteur.absence_terminee(lendemain) is None
+    assert resume(moteur)[-1] == ("17:00", "17:30", "PAUSE", "", "", "")
+    assert not moteur.en_pause
+    assert moteur.ligne_ouverte is None
+
+
+def test_plantage_puis_redemarrage_le_lendemain(dossier, horloge):  # noqa: F811
+    moteur = nouveau_moteur(dossier, horloge)
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("17:55")
+    moteur.signe_de_vie()
+    # plantage dans la soirée, PC rallumé le lendemain
+    horloge.moment = datetime(2026, 11, 18, 8, 30)
+    reprise = nouveau_moteur(dossier, horloge)
+    assert reprise.reprendre_apres_arret() is None
+    assert resume(reprise) == [("08:00", "17:55", "Alpha Industrie", "Armoire ligne 2", "", "")]
+    assert reprise.ligne_ouverte is None

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import tomllib
 
-from pointeuse.config import Config, ConfigInvalide, NomReserve
+from pointeuse.config import Config, ConfigInvalide, NomReserve, Raccourci
 
 EXEMPLE = Path(__file__).resolve().parents[1] / "docs" / "exemples" / "pointeuse_config.toml"
 
@@ -33,8 +33,8 @@ def test_cree_fichier_par_defaut(tmp_path):
     chemin = tmp_path / "sous_dossier" / "pointeuse_config.toml"
     config = Config(chemin)
     assert chemin.exists()
-    assert config.clients() == ["exemple-client"]
-    assert config.projets("exemple-client") == ["exemple-projet"]
+    assert config.clients() == ["Perso", "Client A"]
+    assert config.projets("Client A") == ["26-01-Projet"]
     assert config.reglage("sauvegarde_min") == 5
 
 
@@ -107,6 +107,9 @@ def test_erreur_de_syntaxe(tmp_path):
     ('[clients.a]\np = { tache = ["cdc"] }\n', "clé inconnue « tache »"),
     ('[reglages]\nsauvegarde_min = 0\n', "positif"),
     ('[taches_communes]\nliste = [1, 2]\n', "liste"),
+    ('[reglages]\nafficher_journal = 1\n', "true ou false"),
+    ('[reglages]\nretention_journal_jours = -1\n', "0 ou plus"),
+    ('[reglages]\nabsence_longue_h = true\n', "positif"),
 ])
 def test_erreur_de_structure(tmp_path, texte, message):
     chemin = tmp_path / "c.toml"
@@ -280,3 +283,117 @@ def test_fichier_supprime_est_reecrit(chemin):
     chemin.unlink()
     config.recharger_si_modifie()
     assert Config(chemin).clients() == config.clients()
+
+
+# ─── Réglage modifié par l'appli (case « Masquer le journal ») ───────────────
+
+def test_retention_zero_acceptee(tmp_path):
+    chemin = tmp_path / "c.toml"
+    chemin.write_text("[reglages]\nretention_journal_jours = 0\n", encoding="utf-8")
+    assert Config(chemin).reglage("retention_journal_jours") == 0
+
+
+def test_modifier_reglage_garde_les_commentaires(chemin):
+    config = Config(chemin)
+    assert config.reglage("afficher_journal") is True
+    config.modifier_reglage("afficher_journal", False)
+    texte = chemin.read_text(encoding="utf-8")
+    assert "afficher_journal = false" in texte
+    assert "# vue Journée : événements et moments non pointés" in texte
+    assert tomllib.loads(texte)["reglages"]["afficher_journal"] is False
+    assert Config(chemin).reglage("afficher_journal") is False
+
+
+def test_modifier_reglage_absent_ajoute_dans_la_section(tmp_path):
+    chemin = tmp_path / "c.toml"
+    chemin.write_text("[reglages]\nsauvegarde_min = 1\n\n[clients.a]\n", encoding="utf-8")
+    Config(chemin).modifier_reglage("afficher_journal", False)
+    donnees = tomllib.loads(chemin.read_text(encoding="utf-8"))
+    assert donnees["reglages"] == {"sauvegarde_min": 1, "afficher_journal": False}
+    assert "a" in donnees["clients"]
+
+
+def test_modifier_reglage_sans_section(tmp_path):
+    chemin = tmp_path / "c.toml"
+    chemin.write_text("[clients.a]\n", encoding="utf-8")
+    Config(chemin).modifier_reglage("afficher_journal", False)
+    assert tomllib.loads(chemin.read_text(encoding="utf-8"))["reglages"] == {"afficher_journal": False}
+
+
+def test_modifier_reglage_inconnu(chemin):
+    with pytest.raises(KeyError):
+        Config(chemin).modifier_reglage("inconnu", 1)
+
+
+def test_modifier_reglage_identique_ne_reecrit_pas(chemin):
+    config = Config(chemin)
+    avant = chemin.stat().st_mtime_ns
+    config.modifier_reglage("afficher_journal", True)
+    assert chemin.stat().st_mtime_ns == avant
+
+
+# ─── Boutons rapides [[raccourcis]] (CDC onglet_pointer.md) ──────────────────
+
+RACCOURCIS = '''
+[[raccourcis]]
+client = "Alpha Industrie"
+projet = "Armoire ligne 2"
+
+[[raccourcis]]
+nom = "Bêta"
+client = "Bêta Automatismes"
+
+[[raccourcis]]
+client = "Gamma Énergie"
+projet = "Supervision serres"
+tache = "déploiement"
+description = "sur site"
+'''
+
+
+def test_raccourcis_lus_dans_l_ordre(chemin):
+    modifier_a_la_main(chemin, chemin.read_text(encoding="utf-8") + RACCOURCIS)
+    raccourcis = Config(chemin).raccourcis()
+    assert [r.libelle for r in raccourcis] == ["Alpha Industrie – Armoire ligne 2", "Bêta",
+                                               "Gamma Énergie – Supervision serres – déploiement"]
+    assert raccourcis[1].projet == ""
+    assert raccourcis[2].description == "sur site"
+
+
+def test_sans_raccourcis(chemin):
+    assert Config(chemin).raccourcis() == []
+
+
+def test_raccourcis_du_fichier_par_defaut(tmp_path):
+    raccourcis = Config(tmp_path / "pointeuse_config.toml").raccourcis()
+    assert raccourcis == [
+        Raccourci(nom="Administratif", client="Perso", projet="administratif"),
+        Raccourci(nom="26-01_routage", client="Client A", projet="26-01-Projet", tache="Routage"),
+    ]
+
+
+@pytest.mark.parametrize("texte, message", [
+    ('[raccourcis]\nclient = "A"\n', "deux crochets"),
+    ('[[raccourcis]]\nprojet = "P"\n', "client obligatoire"),
+    ('[[raccourcis]]\nclient = "PAUSE"\n', "réservé"),
+    ('[[raccourcis]]\nclient = "A"\ntache = "t"\n', "une tâche demande un projet"),
+    ('[[raccourcis]]\nclient = "A"\ncouleur = "rouge"\n', "clé inconnue « couleur »"),
+    ('[[raccourcis]]\nclient = "A"\nprojet = 3\n', "projet doit être un texte"),
+    ('[[raccourcis]]\nclient = "A"\nprojet = "visible"\n', "nom de projet"),
+    ('[[raccourcis]]\nclient = "A"\n' * 9, r"8 \[\[raccourcis\]\] au maximum"),
+])
+def test_raccourcis_invalides(tmp_path, texte, message):
+    chemin = tmp_path / "pointeuse_config.toml"
+    chemin.write_text(texte, encoding="utf-8")
+    with pytest.raises(ConfigInvalide, match=message):
+        Config(chemin)
+
+
+def test_ajouter_client_sans_projet(chemin):
+    config = Config(chemin)
+    assert config.ajouter("Delta Services", "", projet_obligatoire=False) == ("Delta Services", "", None)
+    assert "Delta Services" in config.clients()
+    assert config.projets("Delta Services") == []
+    assert config.ajouter("alpha industrie", " ", projet_obligatoire=False) == ("Alpha Industrie", "", None)
+    with pytest.raises(ValueError, match="client est obligatoire"):
+        config.ajouter(" ", "", projet_obligatoire=False)

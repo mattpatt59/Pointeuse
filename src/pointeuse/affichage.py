@@ -28,10 +28,15 @@ def duree_texte(minutes: int) -> str:
 
 
 def libelle_tache(client: str, projet: str, tache: str = "") -> str:
-    morceaux = [client, projet]
-    if tache:
-        morceaux.append(tache)
-    return " / ".join(morceaux)
+    """« client / projet / tâche », sans les parties vides (projet vide : bouton rapide « client seul »)."""
+    return " / ".join(t for t in (client, projet, tache) if t)
+
+
+def nom_pause(ligne: LigneOuverte) -> str:
+    """« pause », ou « pause (Repas) » si la pause a une description."""
+    if ligne.description:
+        return f"pause ({ligne.description})"
+    return "pause"
 
 
 def minutes_ecoulees(ligne: LigneOuverte, maintenant: datetime) -> int:
@@ -44,7 +49,7 @@ def texte_statut(ligne: LigneOuverte | None, maintenant: datetime) -> str:
         return "Aucune tâche en cours"
     heure = ligne.debut.strftime("%H:%M")
     if ligne.est_pause:
-        return f"En pause depuis {heure}"
+        return f"En {nom_pause(ligne)} depuis {heure}"
     return f"En cours depuis {heure}"
 
 
@@ -56,7 +61,7 @@ def texte_info_bulle(ligne: LigneOuverte | None, maintenant: datetime, nb_en_att
         duree = duree_texte(minutes_ecoulees(ligne, maintenant))
         heure = ligne.debut.strftime("%H:%M")
         if ligne.est_pause:
-            texte = f"En pause depuis {heure} ({duree})"
+            texte = f"En {nom_pause(ligne)} depuis {heure} ({duree})"
         else:
             texte = f"{libelle_tache(ligne.client, ligne.projet, ligne.tache)} — depuis {heure} ({duree})"
     if nb_en_attente > 0:

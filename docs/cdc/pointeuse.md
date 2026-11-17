@@ -10,8 +10,8 @@
 
 Besoin d'un outil de pointage simple, sous Windows et Linux, pour savoir combien
 de temps a été passé par client, projet et tâche. L'appli montre la journée en
-cours. Le bilan sur une plus longue période se fera plus tard, en envoyant le CSV
-sur `t-elec.fr/outils/pointeuse` (hors périmètre, voir « Suite : bilan »).
+cours. Le bilan sur une plus longue période s'ouvre dans le navigateur, hors ligne,
+par le menu « Bilan » (ADR 003, voir « Bilan »).
 
 Principe de base : **une personne, une chose à la fois**. À tout instant, il y a
 soit une seule tâche en cours, soit une pause. Le CSV est une suite continue de
@@ -35,7 +35,7 @@ _Aucune — toutes tranchées le 2026-11-17._
 - Clic gauche : ouvre ou ferme le panneau (Windows). Sous Ubuntu/GNOME, l'extension AppIndicator n'ouvre que le menu : accepté, le menu donne accès à tout (MP 2026-11-17).
 - Clic droit : menu `Ouvrir` · `Ouvrir le CSV` · `Ouvrir la config` · `Bilan` (ouvre dans le navigateur le bilan du CSV, page locale générée à côté du CSV — ADR 003) · `Quitter`.
 
-### Panneau — deux onglets
+### Panneau — trois onglets
 
 Sous Windows, le panneau s'ouvre juste au-dessus de l'icône. Sous Linux/Wayland,
 c'est le système qui le place (accepté, MP 2026-11-17).
@@ -51,10 +51,14 @@ c'est le système qui le place (accepté, MP 2026-11-17).
 │  Tâche       [ routage          ▾]  │  ← facultatif
 │  Description [ ...                ] │  ← facultatif
 │                                     │
-│  [ Démarrer ]          [ Pause ]    │
+│  [ ✎ Modifier ]   [ ▶ Démarrer ]    │
+│  [ ❚❚ Pause ] [ ■ Stop ] [ Repas ]  │
+│  ─── Boutons rapides ───            │  ← [[raccourcis]] de la config
 │  □ Afficher les projets masqués     │
 └─────────────────────────────────────┘
 ```
+
+Boutons Modifier, Stop, Repas et boutons rapides : voir `docs/cdc/onglet_pointer.md`.
 
 **Onglet 2 — « Insérer / Journée »** : on insère une tâche à des heures fixes, et on voit la journée.
 
@@ -81,7 +85,9 @@ c'est le système qui le place (accepté, MP 2026-11-17).
 - Elle est lue directement dans le CSV, et la ligne en cours y apparaît aussi.
 - Elle est en lecture seule : pour corriger une plage, on insère par-dessus (voir « Insérer un temps défini »).
 
-**Commun aux deux onglets :**
+**Onglet 3 — « À propos »** : version, lien du dépôt (`settings.URL_DEPOT`, https://github.com/mattpatt59/Pointeuse), licence MIT et mention Qt / PySide6 LGPL, présentation de T-Elec et lien vers t-elec.fr, logo. Liens ouverts dans le navigateur ; aucune donnée envoyée.
+
+**Commun aux onglets « Pointer » et « Insérer / Journée » :**
 
 - **Hiérarchie** :
   - un client contient des projets ; la liste Projet n'affiche que ceux du client choisi ;
@@ -90,7 +96,7 @@ c'est le système qui le place (accepté, MP 2026-11-17).
   - une tâche saisie librement est ajoutée **au projet choisi** ;
   - la description est libre et facultative.
 - Client, Projet et Tâche sont des listes déroulantes **modifiables** : on choisit dans la liste ou on tape un nouveau nom.
-- Client et Projet sont obligatoires pour démarrer.
+- Client et Projet sont obligatoires pour démarrer (exception : bouton rapide « client seul », voir `onglet_pointer.md`).
 - Le changement n'est pris en compte qu'au clic sur **Démarrer**. Sinon, on couperait la tâche en cours au moindre caractère tapé.
 
 ### Démarrer / changer de tâche
@@ -109,6 +115,7 @@ c'est le système qui le place (accepté, MP 2026-11-17).
 - **Reprendre** (le bouton Pause change de libellé) :
   - clôture la pause ;
   - redémarre la dernière tâche (même client, même projet, même tâche, description vide).
+- **Stop** : clôture la ligne en cours sans ouvrir de pause ; **Repas** : une pause décrite « Repas » (voir `onglet_pointer.md`).
 - Quitter l'appli clôture la ligne en cours, qu'il s'agisse d'une tâche ou d'une pause.
 
 ### Pause automatique (veille, session verrouillée)
@@ -123,6 +130,12 @@ c'est le système qui le place (accepté, MP 2026-11-17).
   - Windows : notifications de session et de veille (via `ctypes`, aucune dépendance supplémentaire) ;
   - Linux : D-Bus `org.freedesktop.login1` (veille) et `org.gnome.ScreenSaver` (verrouillage), via QtDBus ;
   - **solution de secours sur les deux OS** : un minuteur vérifie toutes les 30 s l'heure réelle. Un saut de plus de 2 min veut dire que le PC dormait, et on applique alors la même procédure.
+- **Absence longue : pas de question** (MP 2026-11-17). Une absence est longue si elle passe un changement de jour (parti à 18:00, revenu le lendemain à 08:30) ou dure au moins `absence_longue_h` heures (4 h par défaut). Dans ce cas :
+  - la tâche est clôturée à l'heure du verrouillage, comme pour une absence courte ;
+  - une pause en cours est clôturée aussi à l'heure du verrouillage (sinon elle durerait toute la nuit) ;
+  - aucune fenêtre ne s'ouvre et rien ne redémarre : on choisit sa tâche en arrivant ;
+  - l'heure d'arrivée est notée dans le journal des événements ; un oubli se rattrape depuis la vue Journée (voir « Journal des événements »).
+- La même règle s'applique au trou laissé par un plantage (« Sauvegarde de la tâche en cours et redémarrage après plantage », étape 2) : un trou long ne déclenche pas de question.
 
 ### Insérer un temps défini
 
@@ -150,6 +163,42 @@ Exemple : on travaille sur le projet A depuis 10:00 ; entre 10:12 et 10:30, on a
   3. on choisit ensuite la tâche suivante (reprendre la même tâche est proposé par défaut).
 - On perd au plus 5 min, et elles sont rattrapables par la fenêtre de l'étape 2.
 
+### Journal des événements (rattraper les oublis)
+
+But : savoir quand le PC était réellement utilisé, pour **compléter les plages oubliées** (arrivé à 08:12, première tâche pointée à 08:30). Le journal n'est pas un pointage : il ne sert qu'à aider la saisie (MP 2026-11-17).
+
+- Fichier séparé `pointeuse_journal.csv`, à côté du CSV. **`pointeuse.csv` ne change pas**, le lecteur de bilan (ADR 003) non plus : il ne lit que `pointeuse.csv`.
+- Tous les événements sont notés, un par ligne :
+
+  | `evenement` | Quand |
+  |---|---|
+  | `demarrage` | lancement de l'appli (le matin si le PC était éteint : il n'y a pas de déverrouillage) |
+  | `arret` | « Quitter » (absent après un plantage) |
+  | `verrouillage` / `deverrouillage` | session verrouillée / déverrouillée |
+  | `veille` / `reveil` | mise en veille / réveil ; aussi la solution de secours sur l'horloge (saut détecté) |
+
+- **Vue Journée** (onglet « Insérer / Journée ») :
+  - les événements du jour s'affichent entre les lignes, en gris, pour ne pas être confondus avec des pointages ;
+  - les **trous** sont mis en évidence : moments où le PC était actif (entre `demarrage` / `deverrouillage` / `reveil` et l'événement de départ suivant) sans aucune ligne, tâche ou pause. Seuls les trous d'au moins `TROU_MIN_AFFICHE_MIN` minutes sont montrés ;
+  - un clic sur un trou remplit date, début et fin du formulaire « Insérer » : on choisit le client, le projet, et on insère ;
+  - case **« Masquer le journal »** : la vue ne montre plus que les pointages ; le choix est retenu (`afficher_journal` dans `[reglages]`).
+
+  ```
+  │  ─── Journée du 17/11/2026 ──────────────────────     │
+  │  08:12        ◦ déverrouillage                        │
+  │  08:12–08:30  ▒ non pointé                     0 h 18 │  ← clic : remplit l'insertion
+  │  08:30–10:00  exemple-client / projet-x / routage  1 h 30 │
+  │  10:00        ◦ verrouillage                          │
+  │  10:45        ◦ déverrouillage                        │
+  │  10:45–11:00  ▒ non pointé                     0 h 15 │
+  │  11:00– …     autre-client / projet-b   (en cours)    │
+  │  ☐ Masquer le journal                                 │
+  ```
+
+- **Rétention** : réglage `retention_journal_jours` (90 jours par défaut). Au démarrage, les lignes plus anciennes sont retirées (réécriture via `pointeuse_journal.csv.tmp`, puis remplacement). `0` = pas de journal : rien n'est écrit, la vue Journée n'affiche ni événements ni trous.
+- Ce journal est une donnée de présence : il reste local, lisible par l'utilisateur, et limité dans le temps par la rétention. Si l'outil est un jour déployé chez des salariés, l'information des salariés (voire du CSE) est à prévoir.
+- Si l'écriture échoue (fichier ouvert dans un tableur), l'événement est perdu, sans alerte : le journal est une aide, pas une donnée de référence.
+
 ---
 
 ## Fichiers
@@ -167,6 +216,7 @@ Exemple : on travaille sur le projet A depuis 10:00 ; entre 10:12 et 10:30, on a
 |---|---|
 | `pointeuse.csv` | Journal des temps |
 | `pointeuse_config.toml` | Clients, projets, tâches, réglages — modifiable à la main |
+| `pointeuse_journal.csv` | Événements du poste (démarrage, verrouillage…) pour rattraper les oublis — géré par l'appli, purgé selon `retention_journal_jours` |
 | `pointeuse_en_cours.json` | Sauvegarde de la ligne en cours, toutes les 5 min — géré par l'appli |
 | `pointeuse.lock` | Empêche de lancer deux fois la pointeuse sur les mêmes fichiers — géré par l'appli |
 
@@ -189,6 +239,21 @@ date_in;date_out;client;projet;tache;description;duree_min
 - **Ordre d'écriture** : une ligne terminée est d'abord sauvegardée dans `pointeuse_en_cours.json` (avec les lignes encore en attente), puis ajoutée au CSV ; une fois le CSV écrit, elle est retirée du JSON. Un plantage entre les deux ne perd rien ; le doublon éventuel est écarté au redémarrage (MP 2026-11-17).
 - Si l'écriture échoue (fichier ouvert dans Excel, par exemple), la ligne reste dans `pointeuse_en_cours.json` et l'appli réessaie toutes les minutes. Une notification prévient l'utilisateur. Aucune ligne n'est perdue. Un seul CSV : pas de fichier de secours `pointeuse_2.csv` (MP 2026-11-17).
 
+### pointeuse_journal.csv
+
+Même conventions que `pointeuse.csv` (UTF-8 avec BOM, `;`), trié par horodatage, ajout en fin de fichier.
+
+```csv
+horodatage;evenement
+2026-11-17 08:12:40;deverrouillage
+2026-11-17 10:00:05;verrouillage
+2026-11-17 10:45:31;deverrouillage
+2026-11-17 18:02:10;arret
+```
+
+- Horodatage à la seconde ; affiché à la minute dans la vue Journée.
+- Ce n'est pas un contrat avec le bilan : son format peut évoluer sans ADR (note dans `VERSION.md`).
+
 ### pointeuse_config.toml
 
 Format compact : un client = une section, un projet = une ligne (MP 2026-11-17).
@@ -197,6 +262,10 @@ Format compact : un client = une section, un projet = une ligne (MP 2026-11-17).
 [reglages]
 sauvegarde_min = 5          # fréquence de sauvegarde de la ligne en cours
 detection_absence_min = 2   # saut d'horloge considéré comme une veille
+absence_longue_h = 4        # au-delà (ou si le jour change) : pas de question au retour
+retention_journal_jours = 90  # durée de conservation du journal des événements (0 = pas de journal)
+afficher_journal = true     # vue Journée : événements et trous visibles (case « Masquer le journal »)
+  — fait (179 tests), reste à valider sur poste réel
 
 [clients."exemple-client"]
 "projet-x" = { taches = ["cdc", "routage", "tests"] }   # tâches propres au projet
@@ -227,11 +296,11 @@ liste = ["réunion", "administratif"]
 - L'écriture utilise `tomlkit`, qui **conserve les commentaires** et la mise en forme. La lib standard `tomllib` ne sait que lire.
 - La sauvegarde toutes les 5 min va dans `pointeuse_en_cours.json`, **pas** dans le TOML : réécrire le TOML en permanence risquerait d'écraser une modification faite à la main.
 
-### Suite : bilan (hors périmètre)
+### Bilan
 
 - Dans l'appli, seule la journée est visible (onglet 2).
-- Pour un bilan plus long (semaine, mois, par client), on enverra le CSV sur `t-elec.fr/outils/pointeuse`. Cet outil web fera l'objet d'un CDC séparé, plus tard.
-- Le format du CSV décrit ici sert de contrat avec cet outil : toute modification de colonne passe par un ADR (voir `CLAUDE.md`).
+- Pour un bilan plus long (semaine, mois, par client) : menu de l'icône « Bilan », lecteur HTML livré avec l'appli, hors ligne (ADR 003). Il ne lit que `pointeuse.csv`, pas le journal des événements.
+- Le format du CSV décrit ici sert de contrat avec ce lecteur : toute modification de colonne passe par un ADR (voir `CLAUDE.md`).
 
 ---
 
@@ -244,6 +313,7 @@ liste = ["réunion", "administratif"]
 - [ ] Step 5 — Onglet « Insérer / Journée » : insertion avec découpage (tests unitaires sur les cas de recouvrement) + vue de la journée — codé et testé hors écran ; reste à valider sur poste réel
 - [ ] Step 6 — Pause automatique : solution de secours sur l'horloge, puis détection propre à chaque OS — codé et testé ; D-Bus vérifié sous Ubuntu ; reste à valider sur poste réel (veille / verrouillage Linux et Windows)
 - [ ] Step 7 — Exécutable portable Windows + Linux (ADR 002, construit par GitHub Actions) ; lancement à l'ouverture de session (option du menu) — exécutable Linux vérifié en local ; reste la CI réelle et l'exécutable Windows
+- [~] Step 8 — Absence longue sans question (tâche et pause clôturées au départ, même règle après plantage) + journal des événements (écriture, rétention, purge au démarrage) + vue Journée (événements, trous cliquables, « Masquer le journal ») — code et tests faits, reste à valider sur poste réel
 
 ---
 
@@ -258,10 +328,12 @@ liste = ["réunion", "administratif"]
 | `src/pointeuse/config.py` | créé | Lecture et écriture du TOML (tomlkit) |
 | `src/pointeuse/journal.py` | créé | Lecture / écriture du CSV, lignes d'une journée, découpage d'une plage (`decouper`), réécriture atomique (`reecrire`) |
 | `src/pointeuse/moteur.py` | créé | États tâche / pause, file d'attente si CSV bloqué, sauvegarde `pointeuse_en_cours.json`, reprise. L'interface appelle `signe_de_vie()` toutes les 5 min, et toutes les minutes tant que `ecriture_bloquee` |
-| `src/pointeuse/absence.py` | créé | Détection veille / verrouillage : relevé d'horloge toutes les 30 s (secours), D-Bus sous Linux, messages de session Windows |
+| `src/pointeuse/absence.py` | créé | Détection veille / verrouillage : relevé d'horloge toutes les 30 s (secours), D-Bus sous Linux, messages de session Windows ; émet chaque événement pour le journal |
+| `src/pointeuse/evenements.py` | créé | Journal des événements `pointeuse_journal.csv` (écriture, lecture, purge) ; plages où le PC était utilisé et moments non pointés |
 | `src/pointeuse/demarrage_auto.py` | créé | Lancement à l'ouverture de session : registre `HKCU\…\Run` (Windows), `~/.config/autostart/pointeuse.desktop` (Linux) |
 | `src/pointeuse/application.py` | créé | Assemblage : icône de notification, menu, minuteurs, verrou une seule instance, reprise au démarrage |
-| `src/pointeuse/panneau.py` | créé | Panneau à deux onglets, onglet « Pointer » |
+| `src/pointeuse/panneau.py` | créé | Panneau à trois onglets, onglet « Pointer » |
+| `src/pointeuse/onglet_a_propos.py` | créé | Onglet « À propos » : version, dépôt, licences, présentation T-Elec |
 | `src/pointeuse/onglet_journee.py` | créé | Onglet « Insérer / Journée » : plage date / début / fin, insertion avec confirmation, lignes et totaux du jour |
 | `src/pointeuse/formulaire.py` | créé | Client / Projet / Tâche / Description, commun aux onglets et à la fenêtre d'absence |
 | `src/pointeuse/dialogue_absence.py` | créé | Fenêtre « retour d'absence » (plantage, veille, verrouillage) |
@@ -289,17 +361,18 @@ liste = ["réunion", "administratif"]
 - [x] **Distribution** : exécutable portable PyInstaller, un par OS — MP 2026-11-17
 - [x] **Format de l'exécutable** : dossier zippé (« onedir ») au lieu d'un fichier unique, pour la LGPL de Qt et un lancement immédiat ; construit par GitHub Actions — ADR 002, MP 2026-11-17
 - [x] **Lancement à l'ouverture de session** : case à cocher dans le menu de l'icône (exécutable seulement), désactivée par défaut — MP 2026-11-17
-- [x] **Code source (LGPL)** : mention « disponible sur demande auprès de T-Elec » dans `LICENCES_TIERS.md` — MP 2026-11-17
+- [x] **Code source** : ~~disponible sur demande auprès de T-Elec~~ → code libre, dépôt public https://github.com/mattpatt59/Pointeuse, lien dans `LICENCES_TIERS.md` et l'onglet « À propos » — MP 2026-11-17
 - [x] **Emplacement des fichiers** : dossier de l'exécutable (`Documents/` ou `C:\pointeuse\`) — MP 2026-11-17
 - [x] **Une chose à la fois** : jamais de chevauchement, l'insertion découpe ce qu'elle recouvre — MP 2026-11-17
 - [x] **Pause** : écrite comme une ligne, client `PAUSE` (nom réservé) — MP 2026-11-17
-- [x] **Veille / verrouillage** : pause automatique, puis question « qu'avez-vous fait ? » au retour — MP 2026-11-17
+- [x] **Veille / verrouillage** : pause automatique, puis question « qu'avez-vous fait ? » au retour — MP 2026-11-17 ; **sauf absence longue** (changement de jour ou ≥ `absence_longue_h`, 4 h par défaut) : pas de question, tâche et pause clôturées au départ, rien ne redémarre — MP 2026-11-17
+- [x] **Journal des événements** : fichier séparé `pointeuse_journal.csv` (tous les événements : démarrage, arrêt, verrouillage, déverrouillage, veille, réveil), affiché dans la vue Journée pour rattraper les oublis (trous cliquables), case « Masquer le journal » ; `pointeuse.csv` et le lecteur de bilan inchangés ; rétention configurable (`retention_journal_jours`, 90 j par défaut) — MP 2026-11-17
 - [x] **Plantage** : sauvegarde toutes les 5 min, ligne écrite automatiquement jusqu'à la dernière sauvegarde au redémarrage — MP 2026-11-17
 - [x] **Hiérarchie** : Client → Projet (obligatoires, projet lié au client) → Tâche (facultative) + description libre — MP 2026-11-17
 - [x] **Tâches** : rattachées au projet ; liste commune facultative en complément — MP 2026-11-17
 - [x] **Listes** : `pointeuse_config.toml`, enrichi par les saisies libres, `visible = false` pour masquer (nommé `actif` à l'origine, renommé — MP 2026-11-17)
 - [x] **Durée** : `duree_min`, minutes entières — MP 2026-11-17
-- [x] **Interface** : deux onglets — « Pointer » (par défaut) et « Insérer / Journée » — MP 2026-11-17
+- [x] **Interface** : deux onglets — « Pointer » (par défaut) et « Insérer / Journée » — MP 2026-11-17 ; + onglet « À propos » (lien du dépôt https://github.com/mattpatt59/Pointeuse, infos T-Elec) — MP 2026-11-17
 - [x] **CSV bloqué** : lignes en attente dans `pointeuse_en_cours.json` (sauvegardé avant le CSV), pas de second CSV — MP 2026-11-17
 - [x] **Stockage** : CSV seul ; ~~pas de lecteur HTML local~~ → lecteur de bilan livré avec l'appli, ouvert par le menu « Bilan » (ADR 003, remplace « bilan via t-elec.fr ») — MP 2026-11-17
 
@@ -307,7 +380,6 @@ liste = ["réunion", "administratif"]
 
 ## Notes
 
-- Outil web de bilan `t-elec.fr/outils/pointeuse` : CDC séparé, plus tard.
 - Ne jamais mettre de vrais noms de clients dans les exemples ni dans les tests (règle commune §F).
 - Exemple de config (3 clients, 3 tâches par projet) : `docs/exemples/pointeuse_config.toml`.
 - Maquettes de l'interface : `docs/maquettes/` — `maquettes.html` (source) et PNG générés par `generer_png.sh` (`pointer`, `liste`, `inserer`, `absence`). Rendu indicatif : l'appli réelle sera en Qt.

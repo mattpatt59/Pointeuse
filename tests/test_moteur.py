@@ -453,3 +453,73 @@ def test_lignes_du_jour_inclut_les_lignes_en_attente(moteur, horloge):
     horloge.regler("10:00")
     moteur.pause()
     assert [l.client for l in moteur.lignes_du_jour(a("00:00").date())] == ["Alpha Industrie", "Gamma Énergie"]
+
+
+# ─── Onglet Pointer : Modifier, Stop, Repas, boutons rapides (CDC onglet_pointer.md) ─
+
+def test_modifier_garde_l_heure_de_debut(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("09:00")
+    assert moteur.modifier("Bêta Automatismes", "Carte capteur v2", "routage", "  nappe  ")
+    horloge.regler("10:00")
+    moteur.pause()
+    assert resume(moteur) == [("08:00", "10:00", "Bêta Automatismes", "Carte capteur v2", "routage", "nappe")]
+    assert moteur.derniere_tache.client == "Bêta Automatismes"
+
+
+def test_modifier_ajoute_les_noms_libres(moteur):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    moteur.modifier("Alpha Industrie", "Nouveau projet", "nouvelle tâche")
+    assert "Nouveau projet" in moteur.config.projets("Alpha Industrie")
+    assert "nouvelle tâche" in moteur.config.taches_projet("Alpha Industrie", "Nouveau projet")
+
+
+def test_modifier_sans_tache_en_cours(moteur):
+    assert not moteur.modifier("Alpha Industrie", "Armoire ligne 2")
+    moteur.pause()
+    assert not moteur.modifier("Alpha Industrie", "Armoire ligne 2")
+    assert moteur.en_pause
+
+
+def test_demarrer_client_seul_puis_completer(moteur, horloge):
+    moteur.demarrer("Delta Services", "", projet_obligatoire=False)
+    assert moteur.ligne_ouverte.projet == ""
+    assert "Delta Services" in moteur.config.clients()
+    horloge.regler("08:30")
+    moteur.modifier("Delta Services", "Audit")
+    horloge.regler("09:00")
+    moteur.arreter()
+    assert resume(moteur) == [("08:00", "09:00", "Delta Services", "Audit", "", "")]
+
+
+def test_demarrer_sans_projet_refuse_par_defaut(moteur):
+    with pytest.raises(ValueError):
+        moteur.demarrer("Alpha Industrie", "")
+
+
+def test_stop_termine_sans_pause(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("12:00")
+    moteur.arreter()
+    assert moteur.ligne_ouverte is None
+    assert resume(moteur) == [("08:00", "12:00", "Alpha Industrie", "Armoire ligne 2", "", "")]
+
+
+def test_repas_est_une_pause_decrite(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("12:00")
+    moteur.pause("Repas")
+    horloge.regler("13:00")
+    assert moteur.reprendre()
+    assert resume(moteur)[-1] == ("12:00", "13:00", "PAUSE", "", "", "Repas")
+    assert moteur.ligne_ouverte.client == "Alpha Industrie"
+
+
+def test_repas_pendant_une_pause_la_renomme(moteur, horloge):
+    moteur.pause()
+    horloge.regler("08:30")
+    moteur.pause("Repas")
+    assert moteur.ligne_ouverte.debut.strftime("%H:%M") == "08:00"
+    assert moteur.ligne_ouverte.description == "Repas"
+    moteur.pause()   # Pause pendant le repas : rien ne change
+    assert moteur.ligne_ouverte.description == "Repas"

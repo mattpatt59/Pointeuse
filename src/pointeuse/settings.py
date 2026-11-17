@@ -4,15 +4,21 @@
 NOM_FICHIER_CONFIG = "pointeuse_config.toml"
 NOM_FICHIER_CSV = "pointeuse.csv"
 NOM_FICHIER_EN_COURS = "pointeuse_en_cours.json"
+NOM_FICHIER_EVENEMENTS = "pointeuse_journal.csv"   # journal des événements du poste (evenements.py)
 
 # Dossier utilisé en développement (python -m pointeuse), relatif à la racine du dépôt.
 DOSSIER_DATA_DEV = "data"
 
-# ─── Format du CSV (contrat avec le futur outil de bilan : modifier = ADR) ───
+# ─── Format du CSV (contrat avec le lecteur de bilan : modifier = ADR) ───
 COLONNES_CSV = ["date_in", "date_out", "client", "projet", "tache", "description", "duree_min"]
 SEPARATEUR_CSV = ";"
 ENCODAGE_CSV = "utf-8-sig"        # UTF-8 avec BOM : accents corrects dans Excel FR
 FORMAT_DATE_CSV = "%Y-%m-%d %H:%M"
+
+# ─── Journal des événements (aide pour rattraper les oublis, pas un contrat) ─
+COLONNES_EVENEMENTS = ["horodatage", "evenement"]
+FORMAT_HORODATAGE_EVENEMENT = "%Y-%m-%d %H:%M:%S"
+TROU_MIN_AFFICHE_MIN = 5   # vue Journée : un moment actif non pointé plus court n'est pas montré
 
 # ─── Pointage ────────────────────────────────────────────────────────────────
 # Nom de client réservé aux lignes de pause : interdit pour un vrai client.
@@ -20,6 +26,15 @@ CLIENT_PAUSE = "PAUSE"
 
 # ─── Interface ───────────────────────────────────────────────────────────────
 NOM_APPLICATION = "Pointeuse"
+
+# ─── Onglet « À propos » ─────────────────────────────────────────────────────
+URL_DEPOT = "https://github.com/mattpatt59/Pointeuse"
+URL_SITE_SOCIETE = "https://t-elec.fr/"
+NOM_SOCIETE = "T-Elec"
+PRESENTATION_SOCIETE = ("Bureau d'études électronique indépendant basé à Lille : "
+                        "vos produits électroniques, de la conception à la série.")
+LICENCE_APPLICATION = "MIT"
+HAUTEUR_LOGO_A_PROPOS_PX = 56
 
 # ─── Bilan (menu de l'icône) ────────────────────────────────────────────────
 # Lecteur HTML/JS livré avec l'appli (src/pointeuse/lecteur/). Au clic, il est copié à côté du CSV avec les données en .js,
@@ -50,6 +65,9 @@ DUREE_NOTIFICATION_MS = 8000
 DUREE_INSERTION_DEFAUT_MIN = 15         # plage proposée par défaut dans « Insérer » : les 15 dernières minutes
 FORMAT_DATE_QT = "dd/MM/yyyy"           # champs date / heure de l'onglet « Insérer / Journée »
 FORMAT_HEURE_QT = "HH:mm"
+NOMBRE_MAX_RACCOURCIS = 8               # boutons rapides [[raccourcis]] de l'onglet « Pointer »
+COLONNES_RACCOURCIS = 2
+DESCRIPTION_REPAS = "Repas"             # bouton « Repas » : une pause avec cette description
 
 # Charte T-Elec §C
 COULEUR_VERT = "#99CB38"
@@ -65,9 +83,17 @@ COULEUR_BLANC = "#ffffff"
 COULEUR_ORANGE = "#fb8c00"
 COULEUR_ORANGE_CLAIR = "#fff3e0"
 COULEUR_BOUTON_SECONDAIRE = "#546e7a"
+COULEUR_ROUGE = "#ef4444"
+COULEUR_ROUGE_CLAIR = "#fef2f2"
+COULEUR_BOUTON_SUPPRIMER = "#c62828"     # charte §E .btn--del (bouton Stop)
 
 # ─── Réglages par défaut (surchargés par [reglages] du fichier de config) ────
 REGLAGES_DEFAUT = {
     "sauvegarde_min": 5,          # fréquence de sauvegarde de la ligne en cours (min)
     "detection_absence_min": 2,   # saut d'horloge considéré comme une veille (min)
+    "absence_longue_h": 4,        # absence au moins aussi longue (ou changement de jour) : pas de question (h)
+    "retention_journal_jours": 90,  # conservation du journal des événements (jours ; 0 = pas de journal)
+    "afficher_journal": True,     # vue Journée : événements et moments non pointés visibles
 }
+# Réglages entiers qui acceptent 0 (les autres doivent être strictement positifs).
+REGLAGES_ZERO_PERMIS = ("retention_journal_jours",)
