@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Maquettes Pointeuse</title>
+<!--
+  Maquettes de l'interface Pointeuse (CDC docs/cdc/pointeuse.md).
+  Indicatif : l'appli réelle est en PySide6, le rendu Qt sera proche mais pas identique.
+  Une vue par paramètre : maquettes.html?vue=pointer | liste | inserer | absence
+  Export PNG : voir docs/maquettes/generer_png.sh
+-->
+<style>
+:root {
+  --green: #99CB38; --green-dark: #70AD47; --green-deep: #4a7a1a; --green-light: #f2f9e5;
+  --black: #1a1a1a; --gray: #6b7280; --gray-light: #f5f5f5; --white: #fff; --border: #e5e7eb;
+  --orange: #fb8c00; --orange-light: #fff3e0; --blue: #1565c0; --blue-light: #e3f2fd;
+  --sec: #546e7a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: Arial, "Liberation Sans", sans-serif; font-size: 14px; color: var(--black);
+  background: #cfd8dc; min-height: 100vh;
+}
+.vue { display: none; position: relative; width: 100vw; height: 100vh; }
+.vue.on { display: block; }
+
+/* fenêtre */
+.win {
+  position: absolute; background: var(--white); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25), 0 0 0 1px rgba(0,0,0,.08);
+}
+.win-head {
+  background: linear-gradient(135deg, #4a7a1a 0%, #70AD47 55%, #99CB38 100%);
+  color: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 15px;
+}
+.win-head .x { margin-left: auto; opacity: .85; font-weight: 400; }
+.tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--gray-light); }
+.tab { padding: 9px 16px; color: var(--gray); font-weight: 600; border-bottom: 3px solid transparent; }
+.tab.on { color: var(--green-deep); border-bottom-color: var(--green-dark); background: var(--white); }
+.body { padding: 14px 16px 16px; }
+
+/* état */
+.etat {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 6px;
+  background: var(--green-light); border-left: 4px solid var(--green-dark); margin-bottom: 14px;
+}
+.etat .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green-dark); }
+.etat b { color: var(--green-deep); }
+.etat .chrono { margin-left: auto; font-family: monospace; font-size: 16px; color: var(--green-deep); }
+
+/* formulaire */
+.row { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 8px; margin-bottom: 9px; }
+.row label { color: var(--gray); font-size: 13px; }
+.row label i { font-style: normal; font-size: 11px; opacity: .8; }
+.field {
+  border: 1px solid #cfd4da; border-radius: 6px; padding: 7px 9px; background: #fff;
+  display: flex; align-items: center; min-height: 32px;
+}
+.field.combo::after { content: "▾"; margin-left: auto; color: var(--gray); }
+.field.vide { color: #a0a6ad; }
+.field.focus { border-color: var(--green-dark); box-shadow: 0 0 0 3px rgba(153,203,56,.25); }
+.inline { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.inline .field { padding: 7px 9px; }
+.inline span { color: var(--gray); font-size: 13px; }
+
+.btns { display: flex; gap: 10px; margin-top: 14px; }
+.btn { flex: 1; text-align: center; padding: 9px 0; border-radius: 6px; color: #fff; font-weight: 700; }
+.btn--primary { background: var(--green); }
+.btn--warn { background: var(--orange); }
+.btn--sec { background: var(--sec); }
+.btn.petit { flex: 0 0 auto; padding: 9px 22px; }
+.check { margin-top: 12px; color: var(--gray); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.box { width: 14px; height: 14px; border: 1px solid #9aa1a8; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; }
+.box.on { background: var(--green-dark); border-color: var(--green-dark); }
+
+/* liste déroulante ouverte */
+.drop {
+  position: absolute; left: 108px; right: 16px; background: #fff; border: 1px solid #cfd4da;
+  border-radius: 6px; box-shadow: 0 8px 20px rgba(0,0,0,.18); padding: 4px 0; z-index: 3;
+}
+.drop div { padding: 6px 10px; }
+.drop .sel { background: var(--green-light); color: var(--green-deep); font-weight: 700; }
+.drop .sep { padding: 4px 10px 2px; font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: .06em; border-top: 1px solid var(--border); margin-top: 4px; }
+.drop .nouveau { color: var(--gray); font-style: italic; border-top: 1px solid var(--border); margin-top: 4px; }
+
+/* journée */
+.jour-titre {
+  margin: 16px 0 6px; font-weight: 700; color: var(--green-deep); font-size: 13px;
+  text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 8px;
+}
+.jour-titre::after { content: ""; flex: 1; height: 1px; background: #dde8d0; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid #dde8d0; }
+thead th { background: #e8f0e0; color: var(--green-deep); text-transform: uppercase; font-size: 11px; text-align: left; padding: 6px 8px; }
+td { padding: 6px 8px; border-top: 1px solid #eef2ea; }
+tbody tr:nth-child(even) { background: #fafafa; }
+td.h, td.d { font-family: monospace; white-space: nowrap; }
+td.d { text-align: right; }
+tr.pause td { color: var(--gray); font-style: italic; }
+tr.cours td { background: var(--green-light); color: var(--green-deep); font-weight: 700; }
+tr.coupe td { background: var(--blue-light); }
+.tache { color: var(--gray); }
+.totaux { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; }
+.totaux b { font-family: monospace; font-size: 14px; }
+.al-info { background: var(--blue-light); border-left: 4px solid var(--blue); padding: 7px 10px; border-radius: 4px; font-size: 12.5px; margin-top: 4px; }
+.al-warn { background: var(--orange-light); border-left: 4px solid var(--orange); padding: 10px 12px; border-radius: 4px; margin-bottom: 14px; }
+
+/* barre des tâches Windows */
+.taskbar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 44px; background: #202a30;
+  display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; gap: 14px; color: #e6e6e6; font-size: 12px;
+}
+.taskbar .ic { opacity: .8; }
+.taskbar .tray-pt { width: 26px; height: 26px; border-radius: 4px; background: rgba(255,255,255,.12); display: flex; align-items: center; justify-content: center; }
+.taskbar .heure { text-align: right; line-height: 1.25; }
+.tooltip {
+  position: absolute; background: #2b2b2b; color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 4px;
+}
+.legende { position: absolute; left: 16px; top: 14px; color: #37474f; font-size: 13px; }
+.legende b { color: var(--green-deep); }
+.radio { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-weight: 600; }
+.rond { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #9aa1a8; }
+.rond.on { border-color: var(--green-dark); box-shadow: inset 0 0 0 3px #fff; background: var(--green-dark); }
+.retrait { margin-left: 23px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="horloge" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" fill="currentColor"/>
+    <circle cx="12" cy="12" r="8" style="fill: var(--fond, #fff)"/>
+    <path d="M12 7v5.2l3.4 2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<!-- ═══════════ Onglet 1 — Pointer (Windows, au-dessus de l'icône) ═══════════ -->
+<section class="vue" id="pointer">
+  <div class="legende"><b>Onglet « Pointer »</b> — s'ouvre au clic sur l'horloge (Windows : au-dessus de l'icône)</div>
+  <div class="win" style="width:420px; right:96px; bottom:58px;">
+    <div class="win-head"><svg width="18" height="18" style="color:#fff; --fond:#5d9431"><use href="#horloge"/></svg>Pointeuse<span class="x">✕</span></div>
+    <div class="tabs"><div class="tab on">Pointer</div><div class="tab">Insérer / Journée</div></div>
+    <div class="body">
+      <div class="etat"><span class="dot"></span><span>En cours depuis <b>13:30</b></span><span class="chrono">1 h 05</span></div>
+      <div class="row"><label>Client</label><div class="field combo">Bêta Automatismes</div></div>
+      <div class="row"><label>Projet</label><div class="field combo">Carte capteur v2</div></div>
+      <div class="row"><label>Tâche <i>(facultatif)</i></label><div class="field combo">prototype</div></div>
+      <div class="row"><label>Description <i>(facultatif)</i></label><div class="field">assemblage proto n°1</div></div>
+      <div class="btns"><div class="btn btn--primary">▶ Démarrer</div><div class="btn btn--warn">❚❚ Pause</div></div>
+      <div class="check"><span class="box"></span>Afficher les projets terminés</div>
+    </div>
+  </div>
+  <div class="tooltip" style="right:40px; bottom:52px; display:none"></div>
+  <div class="taskbar">
+    <span class="ic">⌃</span><span class="ic">📶</span><span class="ic">🔊</span>
+    <span class="tray-pt"><svg width="18" height="18" style="color:#99CB38"><use href="#horloge"/></svg></span>
+    <span class="heure">14:35<br>17/11/2026</span>
+  </div>
+</section>
+
+<!-- ═══════════ Onglet 1 — liste Tâche ouverte ═══════════ -->
+<section class="vue" id="liste">
+  <div class="legende"><b>Liste « Tâche »</b> — tâches du projet, puis tâches communes, ou saisie libre</div>
+  <div class="win" style="width:420px; left:50%; transform:translateX(-50%); top:44px;">
+    <div class="win-head"><svg width="18" height="18" style="color:#fff; --fond:#5d9431"><use href="#horloge"/></svg>Pointeuse<span class="x">✕</span></div>
+    <div class="tabs"><div class="tab on">Pointer</div><div class="tab">Insérer / Journée</div></div>
+    <div class="body" style="position:relative">
+      <div class="etat"><span class="dot"></span><span>En cours depuis <b>13:30</b></span><span class="chrono">1 h 05</span></div>
+      <div class="row"><label>Client</label><div class="field combo">Bêta Automatismes</div></div>
+      <div class="row"><label>Projet</label><div class="field combo">Carte capteur v2</div></div>
+      <div class="row"><label>Tâche <i>(facultatif)</i></label><div class="field combo focus">prototype</div></div>
+      <div class="drop" style="top:188px">
+        <div>schéma</div>
+        <div>routage</div>
+        <div class="sel">prototype</div>
+        <div class="sep">Tâches communes</div>
+        <div>réunion</div>
+        <div>administratif</div>
+        <div>support téléphone</div>
+        <div class="nouveau">… ou tapez un nouveau nom (ajouté au projet)</div>
+      </div>
+      <div class="row"><label>Description <i>(facultatif)</i></label><div class="field">assemblage proto n°1</div></div>
+      <div class="btns"><div class="btn btn--primary">▶ Démarrer</div><div class="btn btn--warn">❚❚ Pause</div></div>
+      <div class="check"><span class="box"></span>Afficher les projets terminés</div>
+      <div style="height:150px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ Onglet 2 — Insérer / Journée ═══════════ -->
+<section class="vue" id="inserer">
+  <div class="legende"><b>Onglet « Insérer / Journée »</b> — insérer une plage à heures fixes, voir la journée</div>
+  <div class="win" style="width:600px; left:50%; transform:translateX(-50%); top:44px;">
+    <div class="win-head"><svg width="18" height="18" style="color:#fff; --fond:#5d9431"><use href="#horloge"/></svg>Pointeuse<span class="x">✕</span></div>
+    <div class="tabs"><div class="tab">Pointer</div><div class="tab on">Insérer / Journée</div></div>
+    <div class="body">
+      <div class="inline">
+        <span>Le</span><div class="field" style="width:120px">17/11/2026 📅</div>
+        <span>de</span><div class="field" style="width:70px; font-family:monospace">11:00</div>
+        <span>à</span><div class="field" style="width:70px; font-family:monospace">11:20</div>
+      </div>
+      <div class="row"><label>Client</label><div class="field combo">Gamma Énergie</div></div>
+      <div class="row"><label>Projet</label><div class="field combo">Supervision serres</div></div>
+      <div class="row"><label>Tâche <i>(facultatif)</i></label><div class="field combo">support téléphone</div></div>
+      <div class="row"><label>Description <i>(facultatif)</i></label><div class="field">question accès supervision</div></div>
+      <div class="al-info">Cette plage découpe : <b>10:30–12:00</b> Bêta Automatismes / Carte capteur v2 → 10:30–11:00 + 11:20–12:00</div>
+      <div class="btns" style="justify-content:flex-end"><div class="btn btn--primary petit">＋ Insérer</div></div>
+
+      <div class="jour-titre">Journée du mardi 17/11/2026</div>
+      <table>
+        <thead><tr><th>Horaires</th><th>Client / Projet / Tâche</th><th style="text-align:right">Durée</th></tr></thead>
+        <tbody>
+          <tr><td class="h">08:30–10:12</td><td>Bêta Automatismes / Carte capteur v2 <span class="tache">/ routage</span></td><td class="d">1 h 42</td></tr>
+          <tr><td class="h">10:12–10:30</td><td>Alpha Industrie / Armoire ligne 2 <span class="tache">— questions câblage</span></td><td class="d">0 h 18</td></tr>
+          <tr class="coupe"><td class="h">10:30–12:00</td><td>Bêta Automatismes / Carte capteur v2 <span class="tache">/ routage</span></td><td class="d">1 h 30</td></tr>
+          <tr class="pause"><td class="h">12:00–13:30</td><td>PAUSE</td><td class="d">1 h 30</td></tr>
+          <tr class="cours"><td class="h">13:30– …</td><td>Bêta Automatismes / Carte capteur v2 / prototype (en cours)</td><td class="d">1 h 05</td></tr>
+        </tbody>
+      </table>
+      <div class="totaux"><span>Travaillé : <b>4 h 35</b></span><span>Pause : <b>1 h 30</b></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ Retour d'absence (veille / verrouillage / plantage) ═══════════ -->
+<section class="vue" id="absence">
+  <div class="legende"><b>Retour d'absence</b> — après une veille, un verrouillage de session ou un plantage</div>
+  <div class="win" style="width:440px; left:50%; transform:translateX(-50%); top:44px;">
+    <div class="win-head"><svg width="18" height="18" style="color:#fff; --fond:#5d9431"><use href="#horloge"/></svg>Pointeuse — retour d'absence<span class="x">✕</span></div>
+    <div class="body">
+      <div class="al-warn">Absent de <b>15:40</b> à <b>16:25</b> (45 min).<br>Qu'avez-vous fait ?</div>
+      <div class="radio"><span class="rond"></span>Pause</div>
+      <div class="radio"><span class="rond on"></span>J'ai travaillé sur…</div>
+      <div class="retrait">
+        <div class="row"><label>Client</label><div class="field combo">Alpha Industrie</div></div>
+        <div class="row"><label>Projet</label><div class="field combo">Armoire ligne 2</div></div>
+        <div class="row"><label>Tâche <i>(facultatif)</i></label><div class="field combo vide">—</div></div>
+        <div class="row"><label>Description <i>(facultatif)</i></label><div class="field">réunion chantier sur site</div></div>
+      </div>
+      <div class="check"><span class="box on">✓</span>Reprendre ensuite : Bêta Automatismes / Carte capteur v2 / prototype</div>
+      <div class="btns" style="justify-content:flex-end"><div class="btn btn--primary petit">Valider</div></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  var vue = new URLSearchParams(location.search).get("vue");
+  if (!vue) { vue = "pointer"; }
+  document.getElementById(vue).classList.add("on");
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+
+      "Bash(ls*)",
+      "Bash(find . *)",
+      "Bash(grep *)",
+      "Bash(wc *)",
+      "Bash(diff *)",
+
+      "Bash(python3 -m py_compile *)",
+      "Bash(python3 -c *)",
+      "Bash(python3 *)",
+      "Bash(.venv/bin/python *)",
+
+      "Read(/tmp/**)"
+    ],
+    "additionalDirectories": [
+      "/home/matthieu/T_ELEC/pilot/IA"
+    ]
+  }
+}

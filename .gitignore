@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+data/*
+!data/.gitkeep
+save/
+
+# Règles T-Elec copiées depuis pilot/IA : gardées en local, jamais publiées
+.claude/regles_*.md
+docs/maquettes/profil_tmp/
+*.egg-info/

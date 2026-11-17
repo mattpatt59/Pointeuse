@@ -1,0 +1,30 @@
+# pointeuse_config.toml — EXEMPLE
+# Noms fictifs (règle commune §F : jamais de vrais clients dans les exemples).
+#
+# Ce fichier se modifie à la main, l'appli le relit automatiquement.
+# - Un client, un projet ou une tâche tapé dans l'appli est ajouté ici tout seul.
+# - Un client = une section [clients."Nom du client"],
+#   un projet = une ligne "Nom du projet" = { taches = [...] }.
+# - visible = false : masque un client ou un projet fini (visible par défaut).
+#   Case « Afficher les projets masqués » pour le revoir. On peut toujours
+#   pointer dessus en tapant son nom : il reste masqué.
+# - La tâche est facultative au pointage.
+
+[reglages]
+sauvegarde_min = 5          # fréquence de sauvegarde de la ligne en cours
+detection_absence_min = 2   # saut d'horloge considéré comme une veille
+
+[clients."Alpha Industrie"]
+"Armoire ligne 2" = { taches = ["cdc", "schéma électrique", "câblage"] }
+"Rétrofit presse" = { taches = ["étude", "mise en service", "doc"], visible = false }   # projet fini
+
+[clients."Bêta Automatismes"]
+"Carte capteur v2" = { taches = ["schéma", "routage", "prototype"] }
+"Firmware passerelle" = { taches = ["dev", "tests", "recette"] }
+
+[clients."Gamma Énergie"]
+"Supervision serres" = { taches = ["interface web", "base de données", "déploiement"] }
+
+# Tâches proposées dans tous les projets (facultatif, peut rester vide).
+[taches_communes]
+liste = ["réunion", "administratif", "support téléphone"]

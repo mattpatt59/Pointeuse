@@ -1,0 +1,293 @@
+"""Moteur de pointage, sans interface (CDC étapes 2 et 3).
+
+Une seule chose à la fois : une tâche ou une pause est « ouverte » ; la démarrer
+ferme la précédente, qui part dans le CSV. L'heure est injectée (horloge) pour
+que les tests puissent simuler une journée.
+
+Sauvegarde de sécurité : l'état est écrit dans pointeuse_en_cours.json à chaque
+changement et à chaque signe_de_vie() (toutes les 5 min côté interface). Après
+un plantage, reprendre_apres_arret() écrit la ligne ouverte jusqu'à la dernière
+sauvegarde et rend l'Absence à faire qualifier par l'utilisateur.
+"""
+
+import json
+import os
+from dataclasses import dataclass, replace
+from datetime import datetime
+from pathlib import Path
+from typing import Callable
+
+from pointeuse import settings
+from pointeuse.config import Config
+from pointeuse.journal import Journal, JournalBloque, Ligne, a_la_minute
+
+VERSION_EN_COURS = 1
+
+
+@dataclass(frozen=True)
+class LigneOuverte:
+    """Tâche ou pause commencée, pas encore terminée."""
+    debut: datetime
+    client: str
+    projet: str = ""
+    tache: str = ""
+    description: str = ""
+
+    @property
+    def est_pause(self) -> bool:
+        return self.client == settings.CLIENT_PAUSE
+
+    def meme_tache(self, client: str, projet: str, tache: str) -> bool:
+        return (self.client, self.projet, self.tache) == (client, projet, tache)
+
+    def fermer(self, fin: datetime) -> Ligne:
+        return Ligne(self.debut, fin, self.client, self.projet, self.tache, self.description)
+
+    def vers_dict(self) -> dict:
+        return {
+            "debut": self.debut.isoformat(),
+            "client": self.client,
+            "projet": self.projet,
+            "tache": self.tache,
+            "description": self.description,
+        }
+
+    @classmethod
+    def depuis_dict(cls, d: dict) -> "LigneOuverte":
+        return cls(
+            debut=datetime.fromisoformat(d["debut"]),
+            client=d["client"],
+            projet=d.get("projet", ""),
+            tache=d.get("tache", ""),
+            description=d.get("description", ""),
+        )
+
+
+@dataclass(frozen=True)
+class Absence:
+    """Trou à faire qualifier par l'utilisateur (« retour d'absence »)."""
+    debut: datetime
+    fin: datetime
+    tache_precedente: LigneOuverte | None
+
+    @property
+    def duree_min(self) -> int:
+        return int((self.fin - self.debut).total_seconds() // 60)
+
+
+class Moteur:
+
+    def __init__(self, config: Config, journal: Journal, chemin_en_cours: Path,
+                 horloge: Callable[[], datetime] = datetime.now):
+        self.config = config
+        self.journal = journal
+        self.chemin_en_cours = Path(chemin_en_cours)
+        self.horloge = horloge
+        self.ligne_ouverte: LigneOuverte | None = None
+        self.derniere_tache: LigneOuverte | None = None   # pour « Reprendre » après une pause
+        self.en_attente: list[Ligne] = []                 # lignes pas encore écrites (CSV bloqué)
+        self.derniere_sauvegarde: datetime | None = None
+        self.derniere_erreur: str = ""
+
+    # ─── État ────────────────────────────────────────────────────────────────
+
+    @property
+    def en_pause(self) -> bool:
+        return self.ligne_ouverte is not None and self.ligne_ouverte.est_pause
+
+    @property
+    def ecriture_bloquee(self) -> bool:
+        """Vrai tant que des lignes attendent de pouvoir être écrites dans le CSV."""
+        return len(self.en_attente) > 0
+
+    # ─── Actions de l'utilisateur ────────────────────────────────────────────
+
+    def demarrer(self, client: str, projet: str, tache: str | None = None, description: str = "") -> None:
+        """Démarre (ou change de) tâche. Les noms libres sont ajoutés à la config."""
+        client, projet, tache = self.config.ajouter(client, projet, tache)
+        if tache is None:
+            tache = ""
+        description = description.strip()
+        ouverte = self.ligne_ouverte
+        if ouverte is not None and not ouverte.est_pause and ouverte.meme_tache(client, projet, tache):
+            self.modifier_description(description)
+            return
+        maintenant = self._maintenant()
+        self._clore(maintenant)
+        self.ligne_ouverte = LigneOuverte(maintenant, client, projet, tache, description)
+        self.derniere_tache = self.ligne_ouverte
+        self._ecrire_et_sauvegarder()
+
+    def pause(self) -> None:
+        if self.en_pause:
+            return
+        maintenant = self._maintenant()
+        self._clore(maintenant)
+        self.ligne_ouverte = LigneOuverte(maintenant, settings.CLIENT_PAUSE)
+        self._ecrire_et_sauvegarder()
+
+    def reprendre(self) -> bool:
+        """Ferme la pause et relance la dernière tâche (description vidée). Faux si rien à reprendre."""
+        if not self.en_pause or self.derniere_tache is None:
+            return False
+        maintenant = self._maintenant()
+        self._clore(maintenant)
+        self.ligne_ouverte = replace(self.derniere_tache, debut=maintenant, description="")
+        self.derniere_tache = self.ligne_ouverte
+        self._ecrire_et_sauvegarder()
+        return True
+
+    def modifier_description(self, description: str) -> None:
+        if self.ligne_ouverte is None or self.ligne_ouverte.est_pause:
+            return
+        self.ligne_ouverte = replace(self.ligne_ouverte, description=description.strip())
+        self.derniere_tache = self.ligne_ouverte
+        self.sauvegarder()
+
+    def arreter(self) -> None:
+        """Fermeture du programme : la ligne en cours part dans le CSV."""
+        self._clore(self._maintenant())
+        self._ecrire_et_sauvegarder()
+
+    def enregistrer_absence(self, absence: Absence, client: str | None = None, projet: str = "",
+                            tache: str | None = None, description: str = "") -> None:
+        """Qualifie une absence : sans client → ligne PAUSE, sinon la tâche déclarée."""
+        if client is None:
+            ligne = Ligne(absence.debut, absence.fin, settings.CLIENT_PAUSE)
+        else:
+            client, projet, tache = self.config.ajouter(client, projet, tache)
+            if tache is None:
+                tache = ""
+            ligne = Ligne(absence.debut, absence.fin, client, projet, tache, description.strip())
+        if ligne.duree_min > 0:
+            self.en_attente.append(ligne)
+        self._ecrire_et_sauvegarder()
+
+    # ─── Sauvegarde de sécurité et reprise ───────────────────────────────────
+
+    def signe_de_vie(self) -> None:
+        """Appel périodique (réglage sauvegarde_min) : réessaie le CSV, sauvegarde l'état."""
+        self._ecrire_et_sauvegarder()
+
+    def sauvegarder(self) -> None:
+        maintenant = self._maintenant()
+        etat = {
+            "version": VERSION_EN_COURS,
+            "derniere_sauvegarde": maintenant.isoformat(),
+            "ligne_ouverte": None,
+            "derniere_tache": None,
+            "en_attente": [ligne.vers_dict() for ligne in self.en_attente],
+        }
+        if self.ligne_ouverte is not None:
+            etat["ligne_ouverte"] = self.ligne_ouverte.vers_dict()
+        if self.derniere_tache is not None:
+            etat["derniere_tache"] = self.derniere_tache.vers_dict()
+        temporaire = self.chemin_en_cours.with_suffix(".tmp")
+        try:
+            self.chemin_en_cours.parent.mkdir(parents=True, exist_ok=True)
+            temporaire.write_text(json.dumps(etat, ensure_ascii=False, indent=2), encoding="utf-8")
+            os.replace(temporaire, self.chemin_en_cours)
+        except OSError as erreur:
+            self.derniere_erreur = f"Sauvegarde de sécurité impossible : {erreur}"
+            return
+        self.derniere_sauvegarde = maintenant
+
+    def reprendre_apres_arret(self) -> Absence | None:
+        """Au démarrage : récupère l'état laissé par la session précédente.
+
+        Si une ligne était ouverte (plantage, coupure), elle est écrite jusqu'à
+        la dernière sauvegarde et l'Absence qui suit est rendue à l'interface.
+        """
+        etat = self._lire_etat()
+        absence = None
+        if etat is not None:
+            sauvees = [Ligne.depuis_dict(d) for d in etat.get("en_attente", [])]
+            self.en_attente = self._pas_encore_dans_le_csv(sauvees) + self.en_attente
+            if etat.get("derniere_tache"):
+                self.derniere_tache = LigneOuverte.depuis_dict(etat["derniere_tache"])
+            if etat.get("ligne_ouverte"):
+                ouverte = LigneOuverte.depuis_dict(etat["ligne_ouverte"])
+                arret = datetime.fromisoformat(etat["derniere_sauvegarde"])
+                ligne = ouverte.fermer(arret)
+                if ligne.duree_min > 0:
+                    self.en_attente.append(ligne)
+                maintenant = self._maintenant()
+                if maintenant > arret:
+                    absence = Absence(arret, maintenant, ouverte)
+        self.ligne_ouverte = None
+        self._ecrire_et_sauvegarder()
+        return absence
+
+    # ─── Interne ─────────────────────────────────────────────────────────────
+
+    def _maintenant(self) -> datetime:
+        return a_la_minute(self.horloge())
+
+    def _clore(self, fin: datetime) -> None:
+        """Ferme la ligne ouverte et la met en file d'écriture (sauf durée nulle)."""
+        if self.ligne_ouverte is None:
+            return
+        ligne = self.ligne_ouverte.fermer(fin)
+        if ligne.duree_min > 0:
+            self.en_attente.append(ligne)
+        self.ligne_ouverte = None
+
+    def _ecrire_et_sauvegarder(self) -> None:
+        """Règle (MP 2026-11-17) : d'abord la sauvegarde JSON, ensuite le CSV.
+
+        Une ligne terminée est donc toujours dans pointeuse_en_cours.json avant
+        d'être ajoutée au CSV : un plantage entre les deux ne perd rien (et le
+        doublon éventuel est écarté à la reprise, voir _deja_dans_le_csv).
+        """
+        self.sauvegarder()
+        if self.en_attente:
+            self._vider_file()
+            self.sauvegarder()
+
+    def _vider_file(self) -> None:
+        """Écrit les lignes en attente, dans l'ordre. En cas d'échec, elles restent en file."""
+        if not self.en_attente:
+            return
+        try:
+            self.journal.ajouter(self.en_attente)
+        except JournalBloque as erreur:
+            self.derniere_erreur = str(erreur)
+            return
+        self.en_attente = []
+        self.derniere_erreur = ""
+
+    def _pas_encore_dans_le_csv(self, lignes: list[Ligne]) -> list[Ligne]:
+        """Écarte les lignes déjà écrites (plantage juste après l'écriture du CSV)."""
+        if not lignes:
+            return []
+        try:
+            deja_ecrites = set(self.journal.lire())
+        except OSError:
+            return lignes   # CSV illisible pour l'instant : on garde tout en attente
+        resultat = []
+        for ligne in lignes:
+            if ligne not in deja_ecrites:
+                resultat.append(ligne)
+        return resultat
+
+    def _lire_etat(self) -> dict | None:
+        """Lit pointeuse_en_cours.json. Un fichier illisible est mis de côté, pas effacé."""
+        if not self.chemin_en_cours.exists():
+            return None
+        try:
+            etat = json.loads(self.chemin_en_cours.read_text(encoding="utf-8"))
+            if etat.get("version") != VERSION_EN_COURS:
+                raise ValueError("version inconnue")
+            # Valide tout de suite les champs, pour ne pas planter à mi-reprise.
+            for d in etat.get("en_attente", []):
+                Ligne.depuis_dict(d)
+            for cle in ("ligne_ouverte", "derniere_tache"):
+                if etat.get(cle):
+                    LigneOuverte.depuis_dict(etat[cle])
+            datetime.fromisoformat(etat["derniere_sauvegarde"])
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as erreur:
+            illisible = self.chemin_en_cours.with_suffix(".illisible.json")
+            os.replace(self.chemin_en_cours, illisible)
+            self.derniere_erreur = f"Sauvegarde de sécurité illisible, mise de côté dans {illisible.name} : {erreur}"
+            return None
+        return etat

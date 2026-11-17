@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pointeuse"
+version = "0.1.0"
+description = "Pointeuse simple Windows/Linux : icône de notification, pointage client/projet/tâche, export CSV"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = ["PySide6>=6.7", "tomlkit>=0.13"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
