@@ -40,6 +40,7 @@ class Application:
         for libelle, action in (("Ouvrir", self.afficher_panneau),
                                 ("Ouvrir le CSV", lambda: self._ouvrir_fichier(moteur.journal.chemin)),
                                 ("Ouvrir la config", lambda: self._ouvrir_fichier(moteur.config.chemin)),
+                                ("Bilan sur t-elec.fr", self._ouvrir_bilan),
                                 (None, None),
                                 ("Quitter", self.quitter)):
             if libelle is None:
@@ -53,7 +54,8 @@ class Application:
             self.action_demarrage = QAction("Lancer à l'ouverture de session", menu, checkable=True)
             self.action_demarrage.setChecked(demarrage_auto.est_active())
             self.action_demarrage.toggled.connect(self._changer_demarrage_auto)
-            menu.insertAction(menu.actions()[3], self.action_demarrage)
+            separateur = [a for a in menu.actions() if a.isSeparator()][0]
+            menu.insertAction(separateur, self.action_demarrage)
         self.menu = menu   # garder une référence : sinon le menu est détruit
         self.icone.setContextMenu(menu)
 
@@ -213,6 +215,10 @@ class Application:
                                     f"{chemin.name} n'existe pas encore (il est créé à la première tâche terminée).")
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(chemin)))
+
+    def _ouvrir_bilan(self) -> None:
+        """Ouvre le lecteur de bilan dans le navigateur (le CSV y est lu localement, rien n'est envoyé)."""
+        QDesktopServices.openUrl(QUrl(settings.URL_BILAN))
 
     def _changer_demarrage_auto(self, actif: bool) -> None:
         try:

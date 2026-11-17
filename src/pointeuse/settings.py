@@ -20,6 +20,8 @@ CLIENT_PAUSE = "PAUSE"
 
 # ─── Interface ───────────────────────────────────────────────────────────────
 NOM_APPLICATION = "Pointeuse"
+# Lecteur de bilan du CSV (outil gratuit du site T-Elec, 100 % navigateur) — entrée du menu de l'icône.
+URL_BILAN = "https://t-elec.fr/outils/pointeuse/"
 NOM_FICHIER_AUTOSTART = "pointeuse.desktop"   # Linux : ~/.config/autostart/
 NOM_FICHIER_VERROU = "pointeuse.lock"   # empêche de lancer deux fois l'appli sur les mêmes fichiers
 # Linux : le thème Qt « gtk3 » (choisi par défaut sous GNOME) fait planter l'appli sur Ubuntu 24.04

@@ -14,6 +14,7 @@
 - Exécutable portable Windows et Linux (dossier zippé, PyInstaller), avec les licences LGPL de Qt / PySide6 ; option « Lancer à l'ouverture de session » dans le menu de l'icône (CDC étape 7, ADR 002)
 - Version affichée dans l'en-tête et le titre du panneau : « Pointeuse V0.1 » (le numéro de correctif n'apparaît que s'il n'est pas nul) ; version définie à un seul endroit, `src/pointeuse/__init__.py`
 - GitHub Actions : tests Linux + Windows, construction des deux exécutables, release automatique sur tag `v*`
+- Menu de l'icône : « Bilan sur t-elec.fr » ouvre le lecteur de bilan du CSV (https://t-elec.fr/outils/pointeuse/) dans le navigateur
 
 ### Modifié
 - Dépendance `PySide6` remplacée par `PySide6-Essentials` (modules utilisés seulement : exécutable plus léger)

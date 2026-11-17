@@ -33,7 +33,7 @@ _Aucune — toutes tranchées le 2026-11-17._
 - Icône horloge **verte** quand une tâche est en cours, **grise** en pause.
 - Info-bulle : `Client / Projet / Tâche — depuis 10:12 (1 h 05)` ou `En pause depuis 12:00`.
 - Clic gauche : ouvre ou ferme le panneau (Windows). Sous Ubuntu/GNOME, l'extension AppIndicator n'ouvre que le menu : accepté, le menu donne accès à tout (MP 2026-11-17).
-- Clic droit : menu `Ouvrir` · `Ouvrir le CSV` · `Ouvrir la config` · `Quitter`.
+- Clic droit : menu `Ouvrir` · `Ouvrir le CSV` · `Ouvrir la config` · `Bilan sur t-elec.fr` (ouvre https://t-elec.fr/outils/pointeuse/ dans le navigateur) · `Quitter`.
 
 ### Panneau — deux onglets
 
