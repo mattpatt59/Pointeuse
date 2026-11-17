@@ -66,7 +66,7 @@ python3 -m venv .venv
 - [~] Bilan : fusion de plusieurs fichiers autour d'un PC principal (`lecteur/fusion.js`, CDC `fusion.md`) ; pauses du principal tranchées (elles cèdent au travail du secondaire) ; reste à valider sur poste réel
 - [~] Onglet « Pointer » : Modifier, Stop, Repas, boutons rapides `[[raccourcis]]` (CDC `onglet_pointer.md`) ; reste à valider sur poste réel
 - [~] Onglet « À propos » : version, lien du dépôt GitHub, licences, présentation T-Elec — 220 tests au total
-- [x] Version 0.2.0 publiée (journal, fusion, onglet Pointer, À propos, README illustré)
+- [x] Version 0.1.0 publiée (première version diffusée : tout ce qui précède, README illustré)
 
 ## Déploiement
 
