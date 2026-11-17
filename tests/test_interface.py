@@ -433,7 +433,9 @@ def test_boutons_rapides_affiches_et_reconstruits(pointer, moteur):
     ajouter_raccourcis(moteur)
     pointer.rafraichir()
     textes = textes_raccourcis(pointer)
-    assert textes[0].startswith("Alpha Industrie – ")   # tronqué « … » à la largeur d'une colonne
+    # Tronqué « … » à la largeur d'une colonne ; la coupure dépend de la police de l'OS.
+    assert textes[0].startswith("Alpha")
+    assert "Alpha Industrie – Armoire ligne 2".startswith(textes[0].removesuffix("…"))
     assert textes[1] == "Delta Services"
     assert "Projet : Armoire ligne 2" in pointer.boutons_raccourcis[0].toolTip()
     assert not pointer.titre_raccourcis.isHidden()
