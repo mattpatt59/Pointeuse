@@ -2,6 +2,30 @@
 
 ## [Non publié]
 
+## [0.2.0] - 2026-11-17
+
+### Ajouté
+- Journal des événements du poste `pointeuse_journal.csv` (démarrage / arrêt de la Pointeuse, verrouillage / déverrouillage, veille / réveil), conservé `retention_journal_jours` jours (90 par défaut, 0 = pas de journal), purgé au démarrage. Fichier à part : `pointeuse.csv` et le bilan ne changent pas (CDC étape 8)
+- Onglet « Pointer » sur deux lignes : **Modifier** (corrige la tâche en cours sans la couper) / Démarrer, puis Pause / **Stop** (fin de journée, sans pause) / **Repas** (pause décrite « Repas ») ; **boutons rapides** `[[raccourcis]]` déclarés dans `pointeuse_config.toml` — un clic démarre, client seul accepté (projet en rouge, à compléter avec Modifier) (CDC onglet_pointer.md)
+- Vue Journée : événements du poste en gris et moments « non pointés » (PC utilisé, rien de pointé) en orange ; un clic remplit la plage à insérer. Case « Masquer le journal », mémorisée dans la config (`afficher_journal`) (CDC étape 8)
+- Onglet « À propos » : version, lien du dépôt https://github.com/mattpatt59/Pointeuse, licence MIT et mention Qt / PySide6 LGPL, présentation de T-Elec et lien vers t-elec.fr
+- Fichier de config créé au premier lancement : deux boutons rapides d'exemple, « Administratif » (Perso / administratif) et « 26-01_routage » (Client A / 26-01-Projet / Routage)
+- `README.md` de présentation avec captures d'écran (`docs/images/`)
+
+### Modifié
+- `LICENCES_TIERS.md` : le code source n'est plus « disponible sur demande » mais public, lien vers https://github.com/mattpatt59/Pointeuse
+- Absence longue (changement de jour, ou au moins `absence_longue_h` = 4 h) : plus de question au retour, la tâche ou la pause en cours est clôturée à l'heure du départ et rien ne redémarre ; même règle après un plantage (CDC étape 8)
+- Bilan avec plusieurs fichiers (plusieurs PC) : ils ne sont plus additionnés mais **fusionnés** autour d'un PC principal (choisi d'un clic) — un temps du secondaire qui chevauche le principal est retiré, une pause du principal laisse la place au travail du secondaire. Bandeau « temps retirés du PC secondaire » avec le détail et l'export `fusion_rapport.csv` ; bouton « Ajouter un autre PC » ; téléchargement de `pointeuse_fusion.csv` (format de `pointeuse.csv`, fichiers d'origine non modifiés) (CDC fusion.md)
+
+## [0.1.1] - 2026-11-17
+
+Tag `V0.1.1` (sans release automatique : la CI attend `v*` en minuscule) ; l'appli affichait encore 0.1.0.
+
+### Modifié
+- Menu de l'icône « Bilan » (remplace « Bilan sur t-elec.fr ») : ouvre dans le navigateur le bilan du CSV (temps par client / projet / tâche, graphe, export), fichier déjà chargé. Le lecteur HTML/JS est livré avec l'appli (`src/pointeuse/lecteur/`, licence MIT) et copié dans `bilan/` à côté du CSV avec les données en `pointeuse_donnees_tmp.js` : rien n'est envoyé, fonctionne hors connexion (ADR 003)
+
+## [0.1.0] - 2026-11-17
+
 ### Ajouté
 - Initialisation du projet (arborescence, règles, templates) — 2026-11-17
 - Licence MIT — 2026-11-17
@@ -14,19 +38,11 @@
 - Exécutable portable Windows et Linux (dossier zippé, PyInstaller), avec les licences LGPL de Qt / PySide6 ; option « Lancer à l'ouverture de session » dans le menu de l'icône (CDC étape 7, ADR 002)
 - Version affichée dans l'en-tête et le titre du panneau : « Pointeuse V0.1 » (le numéro de correctif n'apparaît que s'il n'est pas nul) ; version définie à un seul endroit, `src/pointeuse/__init__.py`
 - GitHub Actions : tests Linux + Windows, construction des deux exécutables, release automatique sur tag `v*`
-- Menu de l'icône « Bilan » : ouvre dans le navigateur le bilan du CSV (temps par client / projet / tâche, graphe, export), fichier déjà chargé. Le lecteur HTML/JS est livré avec l'appli (`src/pointeuse/lecteur/`, licence MIT) et copié dans `bilan/` à côté du CSV avec les données en `pointeuse_donnees_tmp.js` : rien n'est envoyé, fonctionne hors connexion (ADR 003)
-- Journal des événements du poste `pointeuse_journal.csv` (démarrage / arrêt de la Pointeuse, verrouillage / déverrouillage, veille / réveil), conservé `retention_journal_jours` jours (90 par défaut, 0 = pas de journal), purgé au démarrage. Fichier à part : `pointeuse.csv` et le bilan ne changent pas (CDC étape 8)
-- Onglet « Pointer » sur deux lignes : **Modifier** (corrige la tâche en cours sans la couper) / Démarrer, puis Pause / **Stop** (fin de journée, sans pause) / **Repas** (pause décrite « Repas ») ; **boutons rapides** `[[raccourcis]]` déclarés dans `pointeuse_config.toml` — un clic démarre, client seul accepté (projet en rouge, à compléter avec Modifier) (CDC onglet_pointer.md)
-- Vue Journée : événements du poste en gris et moments « non pointés » (PC utilisé, rien de pointé) en orange ; un clic remplit la plage à insérer. Case « Masquer le journal », mémorisée dans la config (`afficher_journal`) (CDC étape 8)
-- Onglet « À propos » : version, lien du dépôt https://github.com/mattpatt59/Pointeuse, licence MIT et mention Qt / PySide6 LGPL, présentation de T-Elec et lien vers t-elec.fr
-- Fichier de config créé au premier lancement : deux boutons rapides d'exemple, « Administratif » (Perso / administratif) et « 26-01_routage » (Client A / 26-01-Projet / Routage)
+- Menu de l'icône : « Bilan sur t-elec.fr » ouvre le lecteur de bilan du CSV dans le navigateur
 
 ### Modifié
-- `LICENCES_TIERS.md` : le code source n'est plus « disponible sur demande » mais public, lien vers https://github.com/mattpatt59/Pointeuse
 - Dépendance `PySide6` remplacée par `PySide6-Essentials` (modules utilisés seulement : exécutable plus léger)
 - `pointeuse_config.toml` : format compact `[clients."Nom"]` + un projet par ligne `"Projet" = { taches = [...] }` (remplace `[[clients]]` / `[[clients.projets]]`). La clé `actif` devient `visible` (true par défaut) ; case « Afficher les projets masqués ». Un projet masqué reste utilisable en tapant son nom, sans réapparaître. Fichier existant à convertir une fois à la main — voir `docs/exemples/pointeuse_config.toml`
-- Absence longue (changement de jour, ou au moins `absence_longue_h` = 4 h) : plus de question au retour, la tâche ou la pause en cours est clôturée à l'heure du départ et rien ne redémarre ; même règle après un plantage (CDC étape 8)
-- Bilan avec plusieurs fichiers (plusieurs PC) : ils ne sont plus additionnés mais **fusionnés** autour d'un PC principal (choisi d'un clic) — un temps du secondaire qui chevauche le principal est retiré, une pause du principal laisse la place au travail du secondaire. Bandeau « temps retirés du PC secondaire » avec le détail et l'export `fusion_rapport.csv` ; bouton « Ajouter un autre PC » ; téléchargement de `pointeuse_fusion.csv` (format de `pointeuse.csv`, fichiers d'origine non modifiés) (CDC fusion.md)
 
 ### Corrigé
 - Listes Client / Projet / Tâche : flèche « ⌄ » invisible (masquée par la feuille de style) → chevron vert sur fond vert clair, liste dépliée aux couleurs de la charte
