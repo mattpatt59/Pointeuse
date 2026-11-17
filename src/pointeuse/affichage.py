@@ -2,9 +2,22 @@
 
 from datetime import date, datetime, timedelta
 
-from pointeuse import settings
+from pointeuse import __version__, settings
 from pointeuse.journal import Ligne, a_la_minute
 from pointeuse.moteur import LigneOuverte
+
+
+def version_courte(version: str = __version__) -> str:
+    """« 0.1.0 » → « V0.1 » ; « 0.1.2 » → « V0.1.2 » (le correctif n'est montré que s'il existe)."""
+    morceaux = version.split(".")
+    while len(morceaux) > 2 and morceaux[-1] == "0":
+        morceaux.pop()
+    return "V" + ".".join(morceaux)
+
+
+def titre_application() -> str:
+    """En-tête et titre du panneau : « Pointeuse V0.1 »."""
+    return f"{settings.NOM_APPLICATION} {version_courte()}"
 
 
 def duree_texte(minutes: int) -> str:

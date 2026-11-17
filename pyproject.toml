@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pointeuse"
-version = "0.1.0"
+dynamic = ["version"]   # lue dans src/pointeuse/__init__.py (__version__)
 description = "Pointeuse simple Windows/Linux : icône de notification, pointage client/projet/tâche, export CSV"
 license = "MIT"
 requires-python = ">=3.12"
@@ -15,6 +15,9 @@ dependencies = ["PySide6-Essentials>=6.7", "tomlkit>=0.13"]
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 build = ["pyinstaller>=6.11"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pointeuse.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

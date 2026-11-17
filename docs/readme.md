@@ -68,7 +68,7 @@ Menu de l'icône → « Lancer à l'ouverture de session » pour le démarrage a
 Linux : si Qt réclame `libxcb-cursor0`, l'installer (`sudo apt install libxcb-cursor0`).
 Windows : exécutable non signé, SmartScreen peut avertir au premier lancement.
 
-Publier une version : version dans `pyproject.toml` + `VERSION.md`, commit, puis `git tag vX.Y.Z && git push --tags`.
+Publier une version : version dans `src/pointeuse/__init__.py` (`__version__`, seule source, affichée « Pointeuse V0.1 » dans le panneau) + `VERSION.md`, commit, puis `git tag vX.Y.Z && git push --tags`.
 Ne jamais livrer `data/`.
 
 ## Règles de travail

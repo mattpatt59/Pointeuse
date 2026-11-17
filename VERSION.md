@@ -12,6 +12,7 @@
 - Onglet « Insérer / Journée » : insertion d'une tâche à heures fixes qui découpe ce qu'elle recouvre (CSV et tâche en cours, confirmation si une ligne est remplacée) ; lignes du jour choisi et totaux travaillé / pause (CDC étape 5)
 - Pause automatique en cas de veille ou de session verrouillée : la tâche est coupée à l'heure du départ, puis la fenêtre « retour d'absence » demande ce qu'on a fait. Détection par D-Bus (Linux), messages de session (Windows) et, en secours, relevé d'horloge toutes les 30 s (CDC étape 6)
 - Exécutable portable Windows et Linux (dossier zippé, PyInstaller), avec les licences LGPL de Qt / PySide6 ; option « Lancer à l'ouverture de session » dans le menu de l'icône (CDC étape 7, ADR 002)
+- Version affichée dans l'en-tête et le titre du panneau : « Pointeuse V0.1 » (le numéro de correctif n'apparaît que s'il n'est pas nul) ; version définie à un seul endroit, `src/pointeuse/__init__.py`
 - GitHub Actions : tests Linux + Windows, construction des deux exécutables, release automatique sur tag `v*`
 
 ### Modifié

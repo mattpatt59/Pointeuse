@@ -14,13 +14,12 @@ import os
 import platform
 import shutil
 import sys
-import tomllib
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RACINE / "src"))
 
-from pointeuse import settings  # noqa: E402
+from pointeuse import __version__, settings  # noqa: E402
 
 DIST = RACINE / "dist"
 TRAVAIL = RACINE / "build"
@@ -39,8 +38,7 @@ MODULES_EXCLUS = ["PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySi
 
 
 def version() -> str:
-    with open(RACINE / "pyproject.toml", "rb") as fichier:
-        return tomllib.load(fichier)["project"]["version"]
+    return __version__
 
 
 def nom_os() -> str:

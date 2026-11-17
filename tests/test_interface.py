@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QDialog  # noqa: E402
 
-from pointeuse.affichage import duree_texte, texte_info_bulle, texte_statut  # noqa: E402
+from pointeuse.affichage import duree_texte, texte_info_bulle, texte_statut, version_courte  # noqa: E402
 from pointeuse.config import Config  # noqa: E402
 from pointeuse.dialogue_absence import DialogueAbsence  # noqa: E402
 from pointeuse.journal import Journal  # noqa: E402
@@ -286,3 +286,8 @@ def test_inserer_plage_invalide_message(panneau, moteur, monkeypatch):
     journee.inserer()
     assert messages == ["L'heure de fin doit être après l'heure de début."]
     assert moteur.journal.lire() == []
+
+
+@pytest.mark.parametrize("version, texte", [("0.1.0", "V0.1"), ("1.0.0", "V1.0"), ("0.1.2", "V0.1.2")])
+def test_version_courte(version, texte):
+    assert version_courte(version) == texte

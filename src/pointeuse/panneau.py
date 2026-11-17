@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QCheckBox, QFrame, QHBoxLayout, QLabel, QMessageB
                                QTabWidget, QVBoxLayout, QWidget)
 
 from pointeuse import settings
-from pointeuse.affichage import duree_texte, minutes_ecoulees, texte_statut
+from pointeuse.affichage import duree_texte, minutes_ecoulees, texte_statut, titre_application
 from pointeuse.config import ConfigInvalide
 from pointeuse.formulaire import FormulaireTache
 from pointeuse.moteur import Moteur
@@ -159,11 +159,11 @@ class Panneau(QWidget):
         super().__init__(parent, Qt.Tool | Qt.WindowStaysOnTopHint)
         self.setObjectName("panneau")
         self.setAttribute(Qt.WA_StyledBackground, True)
-        self.setWindowTitle(settings.NOM_APPLICATION)
+        self.setWindowTitle(titre_application())
         self.setFixedWidth(settings.LARGEUR_PANNEAU_PX)
         self.quitter_a_la_fermeture = False
 
-        entete = QLabel(settings.NOM_APPLICATION, objectName="entete")
+        entete = QLabel(titre_application(), objectName="entete")
         self.onglets = QTabWidget()
         self.pointer = OngletPointer(moteur, horloge)
         self.onglets.addTab(self.pointer, "Pointer")

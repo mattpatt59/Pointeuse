@@ -55,8 +55,8 @@ Workflow `.github/workflows/ci.yml` :
    l'exécutable 5 s et vérifie qu'il crée sa config. Linux construit sur `ubuntu-22.04`
    (glibc plus ancienne, donc compatible avec plus de distributions). Les archives sont
    publiées comme artefacts du run ;
-3. **publier** (tag `vX.Y.Z` seulement) : vérifie que le tag correspond à la version du
-   `pyproject.toml`, puis crée la release GitHub avec les deux zip, et `VERSION.md` comme
+3. **publier** (tag `vX.Y.Z` seulement) : vérifie que le tag correspond à la version de
+   `src/pointeuse/__init__.py` (`__version__`), puis crée la release GitHub avec les deux zip, et `VERSION.md` comme
    notes de version.
 
 ---
@@ -71,5 +71,5 @@ Workflow `.github/workflows/ci.yml` :
   (Ubuntu : `sudo apt install libxcb-cursor0`).
 - Pas de signature de code : Windows SmartScreen peut avertir au premier lancement
   (« Informations complémentaires » → « Exécuter quand même »).
-- Faire une release : mettre la version à jour dans `pyproject.toml` et `VERSION.md`, commiter,
+- Faire une release : mettre la version à jour dans `src/pointeuse/__init__.py` (`__version__`, seule source : `pyproject.toml` la lit) et `VERSION.md`, commiter,
   `git tag v0.1.0 && git push --tags`.

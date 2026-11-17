@@ -79,9 +79,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Le tag correspond à la version de pyproject.toml
+      - name: Le tag correspond à la version (src/pointeuse/__init__.py)
         run: |
-          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          version=$(python3 -c "import sys; sys.path.insert(0, 'src'); import pointeuse; print(pointeuse.__version__)")
           test "v${version}" = "${GITHUB_REF_NAME}" || { echo "Tag ${GITHUB_REF_NAME} ≠ version v${version}"; exit 1; }
       - uses: actions/download-artifact@v4
         with:
