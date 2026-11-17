@@ -33,7 +33,7 @@ _Aucune — toutes tranchées le 2026-11-17._
 - Icône horloge **verte** quand une tâche est en cours, **grise** en pause.
 - Info-bulle : `Client / Projet / Tâche — depuis 10:12 (1 h 05)` ou `En pause depuis 12:00`.
 - Clic gauche : ouvre ou ferme le panneau (Windows). Sous Ubuntu/GNOME, l'extension AppIndicator n'ouvre que le menu : accepté, le menu donne accès à tout (MP 2026-11-17).
-- Clic droit : menu `Ouvrir` · `Ouvrir le CSV` · `Ouvrir la config` · `Bilan sur t-elec.fr` (ouvre https://t-elec.fr/outils/pointeuse/ dans le navigateur) · `Quitter`.
+- Clic droit : menu `Ouvrir` · `Ouvrir le CSV` · `Ouvrir la config` · `Bilan` (ouvre dans le navigateur le bilan du CSV, page locale générée à côté du CSV — ADR 003) · `Quitter`.
 
 ### Panneau — deux onglets
 
@@ -301,7 +301,7 @@ liste = ["réunion", "administratif"]
 - [x] **Durée** : `duree_min`, minutes entières — MP 2026-11-17
 - [x] **Interface** : deux onglets — « Pointer » (par défaut) et « Insérer / Journée » — MP 2026-11-17
 - [x] **CSV bloqué** : lignes en attente dans `pointeuse_en_cours.json` (sauvegardé avant le CSV), pas de second CSV — MP 2026-11-17
-- [x] **Stockage** : CSV seul, pas de lecteur HTML local ; bilan long plus tard via `t-elec.fr/outils/pointeuse` — MP 2026-11-17
+- [x] **Stockage** : CSV seul ; ~~pas de lecteur HTML local~~ → lecteur de bilan livré avec l'appli, ouvert par le menu « Bilan » (ADR 003, remplace « bilan via t-elec.fr ») — MP 2026-11-17
 
 ---
 

@@ -36,6 +36,7 @@ python3 -m venv .venv
 |---------|---------|
 | `src/pointeuse/` | Code de l'application |
 | `tests/` | Tests unitaires (pytest) |
+| `src/pointeuse/lecteur/` | Lecteur de bilan HTML/JS (menu « Bilan », hors ligne — ADR 003) |
 | `outils/` | Construction de l'exécutable, essai de lancement |
 | `licences/` | Licences livrées avec l'exécutable (LGPL / GPL v3, composants tiers) |
 | `.github/workflows/` | GitHub Actions : tests, construction, release |

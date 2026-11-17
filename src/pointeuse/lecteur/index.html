@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<!--
+    Lecteur de bilan de la Pointeuse — SOURCE UNIQUE : dépôt pointeuse, src/pointeuse/lecteur/.
+    Utilisé hors ligne par la Pointeuse (menu « Bilan » : page copiée et ouverte en local à côté du CSV).
+    Licence MIT (voir LICENSE du dépôt). Liens vers le site en adresses absolues.
+-->
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pointeuse — Outil gratuit T-Elec</title>
+    <meta name="description" content="Outil gratuit pour faire le bilan des temps pointés avec la Pointeuse : temps par client, projet et tâche, par jour, semaine ou mois, export CSV. Aucune donnée envoyée : le fichier est lu par votre navigateur.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="pointeuse.css">
+</head>
+<body>
+
+<!-- ═══ BARRE D'OUTILS ═══ -->
+<header class="barre">
+    <a href="https://t-elec.fr/" class="barre__logo" title="Retour au site T-Elec">
+        <img src="logo.png" alt="T-Elec" height="34">
+    </a>
+    <div class="barre__titre">
+        <span class="tag">Outil gratuit</span>
+        <h1>Pointeuse</h1>
+    </div>
+    <div class="barre__actions">
+        <label class="btn btn--sec" title="Fichier pointeuse.csv (plusieurs fichiers possibles)">
+            Lire un CSV
+            <input type="file" accept=".csv,text/csv" id="fichier" multiple hidden>
+        </label>
+        <button type="button" class="btn btn--primary" id="btn-exporter" title="CSV de la répartition (niveau de détail choisi)">Exporter</button>
+    </div>
+</header>
+
+<!-- ═══ ESPACE DE TRAVAIL ═══ -->
+<main class="espace">
+
+    <!-- Gauche : bilan -->
+    <div class="espace__bilan" id="bilan"></div>
+
+    <!-- Droite : réglages -->
+    <aside class="espace__config" id="config"></aside>
+
+</main>
+
+<footer class="pied">
+    Outil gratuit proposé par <a href="https://t-elec.fr/">T-Elec</a> — bureau d'études électronique.
+    Votre fichier est lu par votre navigateur : aucune donnée n'est envoyée.<br>
+    Pointeuse — logiciel libre, licence MIT.
+</footer>
+
+<div class="depot" id="depot" hidden><p>Déposez votre fichier <code>pointeuse.csv</code></p></div>
+<div class="toast" id="toast" hidden></div>
+
+<!-- Ligne suivante remplacée par la Pointeuse (menu « Bilan ») par <script src="pointeuse_donnees_tmp.js"> -->
+<!-- POINTEUSE:DONNEES -->
+<script src="pointeuse.js"></script>
+</body>
+</html>

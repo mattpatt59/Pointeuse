@@ -11,6 +11,7 @@ from PySide6.QtGui import QAction, QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 from pointeuse import demarrage_auto, settings
+from pointeuse.bilan import CsvAbsent, preparer_bilan
 from pointeuse.absence import DetecteurAbsence, creer_sources
 from pointeuse.affichage import texte_info_bulle
 from pointeuse.chemins import DossierNonInscriptible, est_executable, chemin_config, dossier_programme, verifier_inscriptible
@@ -40,7 +41,7 @@ class Application:
         for libelle, action in (("Ouvrir", self.afficher_panneau),
                                 ("Ouvrir le CSV", lambda: self._ouvrir_fichier(moteur.journal.chemin)),
                                 ("Ouvrir la config", lambda: self._ouvrir_fichier(moteur.config.chemin)),
-                                ("Bilan sur t-elec.fr", self._ouvrir_bilan),
+                                ("Bilan", self._ouvrir_bilan),
                                 (None, None),
                                 ("Quitter", self.quitter)):
             if libelle is None:
@@ -217,8 +218,20 @@ class Application:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(chemin)))
 
     def _ouvrir_bilan(self) -> None:
-        """Ouvre le lecteur de bilan dans le navigateur (le CSV y est lu localement, rien n'est envoyé)."""
-        QDesktopServices.openUrl(QUrl(settings.URL_BILAN))
+        """Ouvre le bilan du CSV dans le navigateur (page locale, rien n'est envoyé — ADR 003).
+
+        La tâche en cours n'y figure pas : elle n'est écrite dans le CSV qu'à sa fin."""
+        chemin_csv = self.moteur.journal.chemin
+        try:
+            page = preparer_bilan(chemin_csv, chemin_csv.parent)
+        except CsvAbsent:
+            QMessageBox.information(None, settings.NOM_APPLICATION,
+                                    f"{chemin_csv.name} n'existe pas encore (il est créé à la première tâche terminée).")
+            return
+        except OSError as erreur:
+            QMessageBox.warning(None, settings.NOM_APPLICATION, f"Impossible de préparer le bilan : {erreur}")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(page)))
 
     def _changer_demarrage_auto(self, actif: bool) -> None:
         try:

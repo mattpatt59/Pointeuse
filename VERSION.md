@@ -14,7 +14,7 @@
 - Exécutable portable Windows et Linux (dossier zippé, PyInstaller), avec les licences LGPL de Qt / PySide6 ; option « Lancer à l'ouverture de session » dans le menu de l'icône (CDC étape 7, ADR 002)
 - Version affichée dans l'en-tête et le titre du panneau : « Pointeuse V0.1 » (le numéro de correctif n'apparaît que s'il n'est pas nul) ; version définie à un seul endroit, `src/pointeuse/__init__.py`
 - GitHub Actions : tests Linux + Windows, construction des deux exécutables, release automatique sur tag `v*`
-- Menu de l'icône : « Bilan sur t-elec.fr » ouvre le lecteur de bilan du CSV (https://t-elec.fr/outils/pointeuse/) dans le navigateur
+- Menu de l'icône « Bilan » : ouvre dans le navigateur le bilan du CSV (temps par client / projet / tâche, graphe, export), fichier déjà chargé. Le lecteur HTML/JS est livré avec l'appli (`src/pointeuse/lecteur/`, licence MIT) et copié dans `bilan/` à côté du CSV avec les données en `pointeuse_donnees_tmp.js` : rien n'est envoyé, fonctionne hors connexion (ADR 003)
 
 ### Modifié
 - Dépendance `PySide6` remplacée par `PySide6-Essentials` (modules utilisés seulement : exécutable plus léger)

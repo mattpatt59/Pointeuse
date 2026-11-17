@@ -78,6 +78,8 @@ def construire() -> Path:
         "--distpath", str(DIST),
         "--workpath", str(TRAVAIL / "pyinstaller"),
         "--specpath", str(TRAVAIL),
+        # Lecteur de bilan HTML/JS (ADR 003) : lu par pointeuse/bilan.py à côté de son module.
+        "--add-data", f"{RACINE / 'src' / 'pointeuse' / 'lecteur'}{os.pathsep}pointeuse/lecteur",
     ]
     for module in MODULES_EXCLUS:
         arguments += ["--exclude-module", module]

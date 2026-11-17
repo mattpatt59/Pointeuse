@@ -20,8 +20,14 @@ CLIENT_PAUSE = "PAUSE"
 
 # ─── Interface ───────────────────────────────────────────────────────────────
 NOM_APPLICATION = "Pointeuse"
-# Lecteur de bilan du CSV (outil gratuit du site T-Elec, 100 % navigateur) — entrée du menu de l'icône.
-URL_BILAN = "https://t-elec.fr/outils/pointeuse/"
+
+# ─── Bilan (menu de l'icône) ────────────────────────────────────────────────
+# Lecteur HTML/JS livré avec l'appli (src/pointeuse/lecteur/). Au clic, il est copié à côté du CSV avec les données en .js,
+# puis ouvert dans le navigateur : rien n'est envoyé, fonctionne hors connexion (ADR 003).
+NOM_DOSSIER_BILAN = "bilan"
+NOM_FICHIER_DONNEES_BILAN = "pointeuse_donnees_tmp.js"
+MARQUEUR_DONNEES_BILAN = "<!-- POINTEUSE:DONNEES -->"
+VERSION_DONNEES_BILAN = 1   # = DONNEES_LOCALES_VERSION dans lecteur/pointeuse.js
 NOM_FICHIER_AUTOSTART = "pointeuse.desktop"   # Linux : ~/.config/autostart/
 NOM_FICHIER_VERROU = "pointeuse.lock"   # empêche de lancer deux fois l'appli sur les mêmes fichiers
 # Linux : le thème Qt « gtk3 » (choisi par défaut sous GNOME) fait planter l'appli sur Ubuntu 24.04
