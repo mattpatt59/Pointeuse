@@ -59,8 +59,8 @@ dépôt** pour le lecteur (pas de contrat à tenir entre deux dépôts).
 - Exécutable : `construire.py` ajoute `lecteur/` (`--add-data`) ; paquet Python :
   `package-data` dans `pyproject.toml`.
 - **Tout hors ligne** : le lecteur ne vit que dans ce dépôt. La version mise en ligne sur
-  `t-elec.fr/outils/pointeuse/` (projet site_web, avant cet ADR) n'est plus suivie ni
-  redéployée (MP 2026-11-17).
+  `t-elec.fr/outils/pointeuse/` (projet site_web, avant cet ADR) est retirée du site
+  (MP 2026-11-17).
 - Un changement de `window.POINTEUSE_CSV` = incrémenter la version des deux côtés.
 - **Licence** : le lecteur suit la licence du projet, **MIT** (`LICENSE`) — MP 2026-11-17.
   Le logo T-Elec (`lecteur/logo.png`) reste la marque de T-Elec : la licence MIT couvre le code,
