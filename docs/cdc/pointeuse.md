@@ -287,8 +287,9 @@ liste = ["réunion", "administratif"]
 - [x] **Icône sous Ubuntu/GNOME** : un clic ouvre le menu (Ouvrir, Ouvrir le CSV, Ouvrir la config, Quitter), pas directement le panneau ; conservé tel quel — MP 2026-11-17
 - [x] **Format de `pointeuse_config.toml`** : compact, `[clients."NOM"]` + un projet par ligne (inline table), plutôt que `[[clients]]` / `[[clients.projets]]` (verbeux) ou JSON (pas de commentaires, virgules piégeuses à la main) — MP 2026-11-17
 - [x] **Distribution** : exécutable portable PyInstaller, un par OS — MP 2026-11-17
-- [ ] **Format de l'exécutable** : dossier zippé (« onedir ») au lieu d'un fichier unique, pour la LGPL de Qt et un lancement immédiat ; construit par GitHub Actions — ADR 002, à valider par MP
-- [ ] **Lancement à l'ouverture de session** : case à cocher dans le menu de l'icône (exécutable seulement), désactivée par défaut — à valider par MP
+- [x] **Format de l'exécutable** : dossier zippé (« onedir ») au lieu d'un fichier unique, pour la LGPL de Qt et un lancement immédiat ; construit par GitHub Actions — ADR 002, MP 2026-11-17
+- [x] **Lancement à l'ouverture de session** : case à cocher dans le menu de l'icône (exécutable seulement), désactivée par défaut — MP 2026-11-17
+- [x] **Code source (LGPL)** : mention « disponible sur demande auprès de T-Elec » dans `LICENCES_TIERS.md` — MP 2026-11-17
 - [x] **Emplacement des fichiers** : dossier de l'exécutable (`Documents/` ou `C:\pointeuse\`) — MP 2026-11-17
 - [x] **Une chose à la fois** : jamais de chevauchement, l'insertion découpe ce qu'elle recouvre — MP 2026-11-17
 - [x] **Pause** : écrite comme une ligne, client `PAUSE` (nom réservé) — MP 2026-11-17

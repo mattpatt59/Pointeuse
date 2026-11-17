@@ -1,7 +1,7 @@
 # ADR — Exécutable portable, licence LGPL et construction GitHub Actions
 
 **Date :** 2026-11-17
-**Statut :** PROPOSÉ
+**Statut :** ACCEPTÉ (MP 2026-11-17)
 
 ---
 

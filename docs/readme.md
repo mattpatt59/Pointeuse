@@ -53,7 +53,7 @@ python3 -m venv .venv
 - [x] Initialisation du projet
 - [x] CDC principal (`docs/cdc/pointeuse.md`, statut PARTIELLEMENT IMPLÉMENTÉ)
 - [x] ADR 001 — choix du toolkit UI (PySide6)
-- [ ] ADR 002 — exécutable « onedir » + GitHub Actions (PROPOSÉ)
+- [x] ADR 002 — exécutable « onedir » + GitHub Actions
 - [x] Étape 1 — config TOML au format compact (`config.py`, 42 tests)
 - [x] Étapes 2 et 3 — moteur, CSV, sauvegarde et reprise (`journal.py`, `moteur.py`)
 - [~] Étape 4 — icône + onglet « Pointer » + fenêtre d'absence (15 tests hors écran) ; validé sous Ubuntu/GNOME, reste Windows
