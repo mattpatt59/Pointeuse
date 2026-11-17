@@ -157,9 +157,9 @@ Exemple : on travaille sur le projet A depuis 10:00 ; entre 10:12 et 10:30, on a
 ### Emplacement : le dossier du programme
 
 - Les fichiers sont créés **dans le même dossier que l'exécutable** (MP 2026-11-17) : on pose `pointeuse.exe` dans `Documents/`, les fichiers apparaissent dans `Documents/`. Si OneDrive pose problème, on le place dans `C:\pointeuse\`.
-- L'exécutable est **portable**, en un seul fichier (PyInstaller « onefile »), sans installateur. Un installateur placerait le programme dans `C:\Program Files\`, où l'on ne peut pas écrire.
+- L'exécutable est **portable**, sans installateur : un dossier `Pointeuse/` livré en zip (PyInstaller « onedir », ADR 002), à dézipper où l'on veut. Un installateur placerait le programme dans `C:\Program Files\`, où l'on ne peut pas écrire.
 - Ce qu'il faut savoir pour l'implémentation :
-  - en mode « onefile », `__file__` pointe vers un dossier temporaire. Le dossier du programme se calcule depuis `sys.executable` ;
+  - dans l'exécutable, `__file__` pointe vers `_internal/` : le dossier du programme se calcule depuis `sys.executable` ;
   - en développement (`python -m pointeuse`), les fichiers vont dans `data/` du dépôt ;
   - si le dossier n'est pas accessible en écriture, un message demande de déplacer le programme.
 
@@ -242,8 +242,8 @@ liste = ["réunion", "administratif"]
 - [x] Step 3 — Sauvegarde toutes les 5 min + reprise au démarrage
 - [ ] Step 4 — Icône dans la zone de notification + onglet « Pointer » (Windows + Linux) — validé sur poste réel Ubuntu/GNOME (MP 2026-11-17) ; reste à valider sous Windows
 - [ ] Step 5 — Onglet « Insérer / Journée » : insertion avec découpage (tests unitaires sur les cas de recouvrement) + vue de la journée — codé et testé hors écran ; reste à valider sur poste réel
-- [ ] Step 6 — Pause automatique : solution de secours sur l'horloge, puis détection propre à chaque OS
-- [ ] Step 7 — Exécutable portable Windows + Linux ; lancement au démarrage de la session (à confirmer)
+- [ ] Step 6 — Pause automatique : solution de secours sur l'horloge, puis détection propre à chaque OS — codé et testé ; D-Bus vérifié sous Ubuntu ; reste à valider sur poste réel (veille / verrouillage Linux et Windows)
+- [ ] Step 7 — Exécutable portable Windows + Linux (ADR 002, construit par GitHub Actions) ; lancement à l'ouverture de session (option du menu) — exécutable Linux vérifié en local ; reste la CI réelle et l'exécutable Windows
 
 ---
 
@@ -258,21 +258,25 @@ liste = ["réunion", "administratif"]
 | `src/pointeuse/config.py` | créé | Lecture et écriture du TOML (tomlkit) |
 | `src/pointeuse/journal.py` | créé | Lecture / écriture du CSV, lignes d'une journée, découpage d'une plage (`decouper`), réécriture atomique (`reecrire`) |
 | `src/pointeuse/moteur.py` | créé | États tâche / pause, file d'attente si CSV bloqué, sauvegarde `pointeuse_en_cours.json`, reprise. L'interface appelle `signe_de_vie()` toutes les 5 min, et toutes les minutes tant que `ecriture_bloquee` |
-| `src/pointeuse/absence.py` | créer | Détection veille / verrouillage (Windows, Linux, secours) |
+| `src/pointeuse/absence.py` | créé | Détection veille / verrouillage : relevé d'horloge toutes les 30 s (secours), D-Bus sous Linux, messages de session Windows |
+| `src/pointeuse/demarrage_auto.py` | créé | Lancement à l'ouverture de session : registre `HKCU\…\Run` (Windows), `~/.config/autostart/pointeuse.desktop` (Linux) |
 | `src/pointeuse/application.py` | créé | Assemblage : icône de notification, menu, minuteurs, verrou une seule instance, reprise au démarrage |
 | `src/pointeuse/panneau.py` | créé | Panneau à deux onglets, onglet « Pointer » |
 | `src/pointeuse/onglet_journee.py` | créé | Onglet « Insérer / Journée » : plage date / début / fin, insertion avec confirmation, lignes et totaux du jour |
 | `src/pointeuse/formulaire.py` | créé | Client / Projet / Tâche / Description, commun aux onglets et à la fenêtre d'absence |
-| `src/pointeuse/dialogue_absence.py` | créé | Fenêtre « retour d'absence » (plantage ; veille à l'étape 6) |
+| `src/pointeuse/dialogue_absence.py` | créé | Fenêtre « retour d'absence » (plantage, veille, verrouillage) |
 | `src/pointeuse/affichage.py`, `icone.py`, `style.py` | créés | Textes affichés, icône dessinée (verte / grise / orange si CSV bloqué), feuille de style charte |
 | `src/pointeuse/__main__.py` | créé | Point d'entrée (`python -m pointeuse`) |
-| `tests/` | créé | `test_config.py`, `test_journal.py`, `test_moteur.py`, `test_interface.py` (Qt hors écran), dont les cas de recouvrement de l'insertion |
+| `outils/construire.py`, `outils/essai_executable.py` | créés | Construction de l'exécutable + archive zip ; essai de lancement (ADR 002) |
+| `.github/workflows/ci.yml` | créé | Tests Linux + Windows, construction des deux exécutables, release sur tag `v*` |
+| `licences/` | créé | LGPL v3, GPL v3, `LICENCES_TIERS.md` — livrés avec l'exécutable |
+| `tests/` | créé | `test_config.py`, `test_journal.py`, `test_moteur.py`, `test_interface.py` (Qt hors écran), `test_absence.py`, `test_demarrage_auto.py`, dont les cas de recouvrement de l'insertion |
 
 ### Dépendances
 
-- `PySide6` — UI, icône dans la zone de notification, D-Bus (ADR 001)
+- `PySide6-Essentials` — UI, icône dans la zone de notification, D-Bus (ADR 001) ; modules complémentaires inutiles
 - `tomlkit` — écriture du TOML en conservant les commentaires
-- `pyinstaller` (dev) — exécutable portable
+- `pyinstaller` (extra `build`) — exécutable portable (ADR 002)
 
 ---
 
@@ -283,6 +287,8 @@ liste = ["réunion", "administratif"]
 - [x] **Icône sous Ubuntu/GNOME** : un clic ouvre le menu (Ouvrir, Ouvrir le CSV, Ouvrir la config, Quitter), pas directement le panneau ; conservé tel quel — MP 2026-11-17
 - [x] **Format de `pointeuse_config.toml`** : compact, `[clients."NOM"]` + un projet par ligne (inline table), plutôt que `[[clients]]` / `[[clients.projets]]` (verbeux) ou JSON (pas de commentaires, virgules piégeuses à la main) — MP 2026-11-17
 - [x] **Distribution** : exécutable portable PyInstaller, un par OS — MP 2026-11-17
+- [ ] **Format de l'exécutable** : dossier zippé (« onedir ») au lieu d'un fichier unique, pour la LGPL de Qt et un lancement immédiat ; construit par GitHub Actions — ADR 002, à valider par MP
+- [ ] **Lancement à l'ouverture de session** : case à cocher dans le menu de l'icône (exécutable seulement), désactivée par défaut — à valider par MP
 - [x] **Emplacement des fichiers** : dossier de l'exécutable (`Documents/` ou `C:\pointeuse\`) — MP 2026-11-17
 - [x] **Une chose à la fois** : jamais de chevauchement, l'insertion découpe ce qu'elle recouvre — MP 2026-11-17
 - [x] **Pause** : écrite comme une ligne, client `PAUSE` (nom réservé) — MP 2026-11-17

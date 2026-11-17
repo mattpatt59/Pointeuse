@@ -1,4 +1,4 @@
-"""Moteur de pointage, sans interface (CDC étapes 2 et 3).
+"""Moteur de pointage, sans interface (CDC étapes 2, 3, 5 et 6).
 
 Une seule chose à la fois : une tâche ou une pause est « ouverte » ; la démarrer
 ferme la précédente, qui part dans le CSV. L'heure est injectée (horloge) pour
@@ -92,6 +92,7 @@ class Moteur:
         self.en_attente: list[Ligne] = []                 # lignes pas encore écrites (CSV bloqué)
         self.derniere_sauvegarde: datetime | None = None
         self.derniere_erreur: str = ""
+        self.absence_debut: datetime | None = None        # veille / verrouillage en cours (étape 6)
 
     # ─── État ────────────────────────────────────────────────────────────────
 
@@ -149,8 +150,15 @@ class Moteur:
         self.sauvegarder()
 
     def arreter(self) -> None:
-        """Fermeture du programme : la ligne en cours part dans le CSV."""
-        self._clore(self._maintenant())
+        """Fermeture du programme : la ligne en cours part dans le CSV.
+
+        Arrêt du PC depuis l'écran de verrouillage : la ligne s'arrête au verrouillage.
+        """
+        fin = self._maintenant()
+        if self.absence_debut is not None and self.ligne_ouverte is not None:
+            fin = max(self.ligne_ouverte.debut, min(fin, self.absence_debut))
+        self.absence_debut = None
+        self._clore(fin)
         self._ecrire_et_sauvegarder()
 
     def enregistrer_absence(self, absence: Absence, client: str | None = None, projet: str = "",
@@ -166,6 +174,41 @@ class Moteur:
         if ligne.duree_min > 0:
             self.en_attente.append(ligne)
         self._ecrire_et_sauvegarder()
+
+    # ─── Pause automatique : veille, session verrouillée (étape 6) ───────────
+
+    def absence_commencee(self, debut: datetime) -> None:
+        """Le PC se verrouille ou s'endort : on note l'heure, la ligne reste ouverte.
+
+        Elle n'est coupée qu'au retour, si l'absence a duré (voir absence_terminee). L'heure
+        est sauvegardée : après une coupure pendant l'absence, la reprise coupe la ligne ici.
+        """
+        if self.absence_debut is not None:
+            return
+        self.absence_debut = a_la_minute(debut)
+        self.sauvegarder()
+
+    def absence_terminee(self, fin: datetime) -> Absence | None:
+        """Retour : rend l'Absence à faire qualifier, ou None si rien à demander.
+
+        Rien à demander si l'absence est plus courte que detection_absence_min (la tâche
+        continue sans coupure), ou s'il n'y avait pas de tâche en cours (rien, ou pause :
+        la pause continue).
+        """
+        debut = self.absence_debut
+        if debut is None:
+            return None
+        self.absence_debut = None
+        fin = a_la_minute(fin)
+        ouverte = self.ligne_ouverte
+        trop_court = (fin - debut).total_seconds() < self.config.reglage("detection_absence_min") * 60
+        if trop_court or ouverte is None or ouverte.est_pause or fin <= ouverte.debut:
+            self.sauvegarder()
+            return None
+        debut = max(debut, ouverte.debut)
+        self._clore(debut)
+        self._ecrire_et_sauvegarder()
+        return Absence(debut, fin, ouverte)
 
     # ─── Insertion d'un temps défini (onglet « Insérer / Journée ») ──────────
 
@@ -247,7 +290,10 @@ class Moteur:
             "ligne_ouverte": None,
             "derniere_tache": None,
             "en_attente": [ligne.vers_dict() for ligne in self.en_attente],
+            "absence_debut": None,
         }
+        if self.absence_debut is not None:
+            etat["absence_debut"] = self.absence_debut.isoformat()
         if self.ligne_ouverte is not None:
             etat["ligne_ouverte"] = self.ligne_ouverte.vers_dict()
         if self.derniere_tache is not None:
@@ -278,6 +324,10 @@ class Moteur:
             if etat.get("ligne_ouverte"):
                 ouverte = LigneOuverte.depuis_dict(etat["ligne_ouverte"])
                 arret = datetime.fromisoformat(etat["derniere_sauvegarde"])
+                if etat.get("absence_debut"):
+                    # Coupure pendant une veille / un verrouillage : la tâche s'est arrêtée là.
+                    arret = min(arret, datetime.fromisoformat(etat["absence_debut"]))
+                arret = max(arret, ouverte.debut)
                 ligne = ouverte.fermer(arret)
                 if ligne.duree_min > 0:
                     self.en_attente.append(ligne)
@@ -285,6 +335,7 @@ class Moteur:
                 if maintenant > arret:
                     absence = Absence(arret, maintenant, ouverte)
         self.ligne_ouverte = None
+        self.absence_debut = None
         self._ecrire_et_sauvegarder()
         return absence
 
@@ -355,6 +406,8 @@ class Moteur:
                 if etat.get(cle):
                     LigneOuverte.depuis_dict(etat[cle])
             datetime.fromisoformat(etat["derniere_sauvegarde"])
+            if etat.get("absence_debut"):
+                datetime.fromisoformat(etat["absence_debut"])
         except (OSError, ValueError, KeyError, TypeError, AttributeError) as erreur:
             illisible = self.chemin_en_cours.with_suffix(".illisible.json")
             os.replace(self.chemin_en_cours, illisible)

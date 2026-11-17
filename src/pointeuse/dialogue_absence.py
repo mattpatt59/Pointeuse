@@ -1,4 +1,4 @@
-"""Fenêtre « retour d'absence » : après un plantage (et à l'étape 6, après une veille)."""
+"""Fenêtre « retour d'absence » : après un plantage, une veille ou un verrouillage."""
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton,

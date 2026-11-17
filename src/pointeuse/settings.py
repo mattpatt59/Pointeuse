@@ -20,6 +20,7 @@ CLIENT_PAUSE = "PAUSE"
 
 # ─── Interface ───────────────────────────────────────────────────────────────
 NOM_APPLICATION = "Pointeuse"
+NOM_FICHIER_AUTOSTART = "pointeuse.desktop"   # Linux : ~/.config/autostart/
 NOM_FICHIER_VERROU = "pointeuse.lock"   # empêche de lancer deux fois l'appli sur les mêmes fichiers
 # Linux : le thème Qt « gtk3 » (choisi par défaut sous GNOME) fait planter l'appli sur Ubuntu 24.04
 # (GLib : clé xsettings « antialiasing » absente → arrêt brutal). Le thème « gnome » de Qt n'a pas ce souci.
@@ -34,6 +35,7 @@ LARGEUR_CHAMP_HEURE_PX = 64             # champs « de … à … » de l'onglet
 LARGEUR_FLECHE_LISTE_PX = 26            # zone cliquable « ⌄ » à droite des listes Client / Projet / Tâche
 DOSSIER_TEMP_STYLE = "pointeuse_style"  # images de la feuille de style, dans le dossier temporaire du système
 MARGE_PANNEAU_PX = 8                    # écart entre l'icône de notification et le panneau (Windows)
+RELEVE_HORLOGE_S = 30                   # pause automatique : relevé de secours (un trou = le PC dormait)
 RAFRAICHISSEMENT_AFFICHAGE_S = 30       # mise à jour de l'info-bulle et du chrono
 VERIFICATION_MIN = 1                    # tick : sauvegarde périodique, réessai du CSV bloqué
 DUREE_NOTIFICATION_MS = 8000

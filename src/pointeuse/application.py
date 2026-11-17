@@ -1,17 +1,19 @@
-"""Assemblage : icône de notification, panneau, minuteurs, reprise au démarrage."""
+"""Assemblage : icône de notification, panneau, minuteurs, reprise au démarrage, pause automatique."""
 
 import os
 import sys
 from dataclasses import replace
 from datetime import datetime
+from pathlib import Path
 
 from PySide6.QtCore import QLockFile, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
-from pointeuse import settings
+from pointeuse import demarrage_auto, settings
+from pointeuse.absence import DetecteurAbsence, creer_sources
 from pointeuse.affichage import texte_info_bulle
-from pointeuse.chemins import DossierNonInscriptible, chemin_config, dossier_programme, verifier_inscriptible
+from pointeuse.chemins import DossierNonInscriptible, est_executable, chemin_config, dossier_programme, verifier_inscriptible
 from pointeuse.config import Config, ConfigInvalide
 from pointeuse.dialogue_absence import DialogueAbsence
 from pointeuse.icone import icone_etat
@@ -46,6 +48,12 @@ class Application:
                 element = QAction(libelle, menu)
                 element.triggered.connect(action)
                 menu.addAction(element)
+        if est_executable():
+            # Lancement à l'ouverture de session (étape 7) : sans objet en développement.
+            self.action_demarrage = QAction("Lancer à l'ouverture de session", menu, checkable=True)
+            self.action_demarrage.setChecked(demarrage_auto.est_active())
+            self.action_demarrage.toggled.connect(self._changer_demarrage_auto)
+            menu.insertAction(menu.actions()[3], self.action_demarrage)
         self.menu = menu   # garder une référence : sinon le menu est détruit
         self.icone.setContextMenu(menu)
 
@@ -54,6 +62,12 @@ class Application:
         self.minuteur_verification = QTimer(interval=settings.VERIFICATION_MIN * 60 * 1000)
         self.minuteur_verification.timeout.connect(self.verifier)
         qapp.aboutToQuit.connect(self.moteur.arreter)
+
+        # Pause automatique (étape 6) : veille, session verrouillée.
+        self.detecteur = DetecteurAbsence(lambda: moteur.config.reglage("detection_absence_min"))
+        self.detecteur.absence_commencee.connect(self.moteur.absence_commencee)
+        self.detecteur.absence_terminee.connect(self._retour_absence)
+        self.sources_absence = creer_sources(self.detecteur)   # garder une référence
 
     def demarrer(self) -> None:
         if QSystemTrayIcon.isSystemTrayAvailable():
@@ -72,6 +86,7 @@ class Application:
         absence = self.moteur.reprendre_apres_arret()
         if absence is not None and absence.duree_min > 0:
             self.traiter_absence(absence)
+        self.detecteur.demarrer()
         self.panneau.pointer.preremplir()
         self.afficher_panneau()
 
@@ -157,9 +172,19 @@ class Application:
 
     # ─── Absence ─────────────────────────────────────────────────────────────
 
+    def _retour_absence(self, fin) -> None:
+        absence = self.moteur.absence_terminee(fin)
+        if absence is not None and absence.duree_min > 0:
+            self.traiter_absence(absence)
+        else:
+            self.mettre_a_jour()
+
     def traiter_absence(self, absence) -> None:
+        self.mettre_a_jour()   # l'icône passe au gris pendant la question
         dialogue = DialogueAbsence(self.moteur.config, absence)
+        self.detecteur.suspendre(True)
         dialogue.exec()
+        self.detecteur.suspendre(False)
         # L'absence court jusqu'à la réponse, pas seulement jusqu'à l'ouverture de la fenêtre.
         absence = replace(absence, fin=max(absence.fin, a_la_minute(datetime.now())))
         try:
@@ -188,6 +213,18 @@ class Application:
                                     f"{chemin.name} n'existe pas encore (il est créé à la première tâche terminée).")
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(chemin)))
+
+    def _changer_demarrage_auto(self, actif: bool) -> None:
+        try:
+            if actif:
+                demarrage_auto.activer(Path(sys.executable))
+            else:
+                demarrage_auto.desactiver()
+        except OSError as erreur:
+            QMessageBox.warning(None, settings.NOM_APPLICATION, f"Réglage du démarrage impossible : {erreur}")
+            self.action_demarrage.blockSignals(True)
+            self.action_demarrage.setChecked(demarrage_auto.est_active())
+            self.action_demarrage.blockSignals(False)
 
     def quitter(self) -> None:
         self.moteur.arreter()

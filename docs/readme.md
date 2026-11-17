@@ -13,7 +13,8 @@ insérer une plage horaire passée sur un autre projet. Tout est consigné en CS
 - Python 3.12+ (venv `.venv/`)
 - UI + icône de notification : PySide6 (Qt 6) — voir `docs/adr/001-toolkit-ui.md`
 - Stockage : fichier CSV local
-- Packaging : PyInstaller, exécutable portable « onefile » par OS (pas d'installateur)
+- Packaging : PyInstaller, dossier portable zippé (« onedir ») par OS, pas d'installateur — voir `docs/adr/002-executable-et-ci.md`
+- Intégration continue : GitHub Actions (`.github/workflows/ci.yml`) — tests Linux + Windows, construction des deux exécutables, release sur tag `v*`
 
 ## Développement
 
@@ -22,6 +23,11 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/python -m pytest
 .venv/bin/python -m pointeuse      # lance l'appli (fichiers dans data/)
+
+# exécutable de l'OS courant → dist/Pointeuse/ + dist/Pointeuse-<version>-<os>-<machine>.zip
+.venv/bin/python -m pip install -e ".[build]"
+.venv/bin/python outils/construire.py
+.venv/bin/python outils/essai_executable.py   # lance l'exécutable 5 s, vérifie qu'il démarre
 ```
 
 ## Structure des dossiers
@@ -30,6 +36,9 @@ python3 -m venv .venv
 |---------|---------|
 | `src/pointeuse/` | Code de l'application |
 | `tests/` | Tests unitaires (pytest) |
+| `outils/` | Construction de l'exécutable, essai de lancement |
+| `licences/` | Licences livrées avec l'exécutable (LGPL / GPL v3, composants tiers) |
+| `.github/workflows/` | GitHub Actions : tests, construction, release |
 | `assets/` | Icônes (horloge), ressources UI |
 | `data/` | CSV de pointage en dev (non commité) |
 | `docs/cdc/` | Cahiers des charges et spécifications |
@@ -44,14 +53,22 @@ python3 -m venv .venv
 - [x] Initialisation du projet
 - [x] CDC principal (`docs/cdc/pointeuse.md`, statut PARTIELLEMENT IMPLÉMENTÉ)
 - [x] ADR 001 — choix du toolkit UI (PySide6)
+- [ ] ADR 002 — exécutable « onedir » + GitHub Actions (PROPOSÉ)
 - [x] Étape 1 — config TOML au format compact (`config.py`, 42 tests)
 - [x] Étapes 2 et 3 — moteur, CSV, sauvegarde et reprise (`journal.py`, `moteur.py`)
 - [~] Étape 4 — icône + onglet « Pointer » + fenêtre d'absence (15 tests hors écran) ; validé sous Ubuntu/GNOME, reste Windows
-- [~] Étape 5 — onglet « Insérer / Journée » (`onglet_journee.py`) : insertion avec découpage, journée et totaux ; reste à valider sur poste réel — 114 tests au total
+- [~] Étape 5 — onglet « Insérer / Journée » (`onglet_journee.py`) : insertion avec découpage, journée et totaux ; reste à valider sur poste réel
+- [~] Étape 6 — pause automatique (`absence.py`) : relevé d'horloge de secours, D-Bus sous Linux, messages de session sous Windows ; reste à valider sur poste réel
+- [~] Étape 7 — exécutable portable (`outils/construire.py`), lancement à l'ouverture de session (`demarrage_auto.py`), CI GitHub Actions ; exécutable Linux vérifié en local, reste Windows et le premier passage de la CI — 135 tests au total
 
 ## Déploiement
 
-Exécutable portable posé où l'on veut (`Documents/`, `C:\pointeuse\`) : le CSV et la config sont créés dans le même dossier.
+Télécharger le zip de l'OS dans les releases GitHub (ou les artefacts d'un run Actions), le dézipper où l'on veut (`Documents/`, `C:\pointeuse\`) et lancer `Pointeuse` (`Pointeuse.exe`) dans le dossier `Pointeuse/` : le CSV et la config sont créés à côté.
+Menu de l'icône → « Lancer à l'ouverture de session » pour le démarrage automatique.
+Linux : si Qt réclame `libxcb-cursor0`, l'installer (`sudo apt install libxcb-cursor0`).
+Windows : exécutable non signé, SmartScreen peut avertir au premier lancement.
+
+Publier une version : version dans `pyproject.toml` + `VERSION.md`, commit, puis `git tag vX.Y.Z && git push --tags`.
 Ne jamais livrer `data/`.
 
 ## Règles de travail

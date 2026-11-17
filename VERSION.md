@@ -10,8 +10,12 @@
 - Sauvegarde de sécurité `pointeuse_en_cours.json` et reprise après plantage (CDC étape 3)
 - Interface : icône horloge dans la zone de notification, onglet « Pointer », fenêtre « retour d'absence » après plantage, alerte si le CSV est bloqué (CDC étape 4)
 - Onglet « Insérer / Journée » : insertion d'une tâche à heures fixes qui découpe ce qu'elle recouvre (CSV et tâche en cours, confirmation si une ligne est remplacée) ; lignes du jour choisi et totaux travaillé / pause (CDC étape 5)
+- Pause automatique en cas de veille ou de session verrouillée : la tâche est coupée à l'heure du départ, puis la fenêtre « retour d'absence » demande ce qu'on a fait. Détection par D-Bus (Linux), messages de session (Windows) et, en secours, relevé d'horloge toutes les 30 s (CDC étape 6)
+- Exécutable portable Windows et Linux (dossier zippé, PyInstaller), avec les licences LGPL de Qt / PySide6 ; option « Lancer à l'ouverture de session » dans le menu de l'icône (CDC étape 7, ADR 002)
+- GitHub Actions : tests Linux + Windows, construction des deux exécutables, release automatique sur tag `v*`
 
 ### Modifié
+- Dépendance `PySide6` remplacée par `PySide6-Essentials` (modules utilisés seulement : exécutable plus léger)
 - `pointeuse_config.toml` : format compact `[clients."Nom"]` + un projet par ligne `"Projet" = { taches = [...] }` (remplace `[[clients]]` / `[[clients.projets]]`). La clé `actif` devient `visible` (true par défaut) ; case « Afficher les projets masqués ». Un projet masqué reste utilisable en tapant son nom, sans réapparaître. Fichier existant à convertir une fois à la main — voir `docs/exemples/pointeuse_config.toml`
 
 ### Corrigé
