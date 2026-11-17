@@ -170,3 +170,119 @@ def test_dialogue_absence_ferme_sans_valider_vaut_pause(qapp, moteur):
     dialogue.reject()
     assert not dialogue.travail
     assert not dialogue.reprendre
+
+
+# ─── Onglet « Insérer / Journée » (étape 5) ──────────────────────────────────
+
+from datetime import date  # noqa: E402
+
+from PySide6.QtCore import QTime  # noqa: E402
+from PySide6.QtWidgets import QMessageBox  # noqa: E402
+
+from pointeuse.affichage import minutes_dans_le_jour, texte_plage, totaux_du_jour  # noqa: E402
+from pointeuse.journal import Ligne  # noqa: E402
+
+JOUR = date(2026, 11, 17)
+
+
+def test_texte_plage_et_minuit():
+    assert texte_plage(datetime(2026, 11, 17, 8, 30), datetime(2026, 11, 17, 10, 12), JOUR) == "08:30–10:12"
+    assert texte_plage(datetime(2026, 11, 17, 13, 30), None, JOUR) == "13:30– …"
+    assert texte_plage(datetime(2026, 11, 16, 23, 0), datetime(2026, 11, 17, 1, 0), JOUR) == "16/11 23:00–01:00"
+    assert minutes_dans_le_jour(datetime(2026, 11, 16, 23, 0), datetime(2026, 11, 17, 1, 0), JOUR) == 60
+
+
+def test_totaux_du_jour_ligne_en_cours_comprise():
+    lignes = [Ligne(datetime(2026, 11, 16, 23, 30), datetime(2026, 11, 17, 0, 30), "A", "X"),
+              Ligne(datetime(2026, 11, 17, 8, 0), datetime(2026, 11, 17, 9, 0), "A", "X"),
+              Ligne(datetime(2026, 11, 17, 9, 0), datetime(2026, 11, 17, 9, 15), "PAUSE")]
+    ouverte = LigneOuverte(datetime(2026, 11, 17, 9, 15), "A", "X")
+    assert totaux_du_jour(lignes, ouverte, datetime(2026, 11, 17, 10, 0, 40), JOUR) == (30 + 60 + 45, 15)
+
+
+@pytest.fixture
+def panneau(qapp, moteur, horloge):
+    panneau = Panneau(moteur, horloge=lambda: horloge["t"])
+    yield panneau
+    panneau.deleteLater()
+
+
+def test_journee_plage_par_defaut(panneau):
+    journee = panneau.journee
+    assert journee.jour() == JOUR
+    assert journee.plage() == (datetime(2026, 11, 17, 8, 45), datetime(2026, 11, 17, 9, 0))
+    assert journee.date.maximumDate().toPython() == JOUR
+    assert journee.titre.text() == "Journée du 17/11/2026"
+
+
+def test_journee_affiche_lignes_et_totaux(panneau, moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2", "câblage", "bornier X1")
+    horloge["t"] = datetime(2026, 11, 17, 10, 0)
+    moteur.pause()
+    horloge["t"] = datetime(2026, 11, 17, 10, 20)
+    panneau.journee.rafraichir()
+    arbre = panneau.journee.lignes
+    assert arbre.topLevelItemCount() == 2
+    premiere = arbre.topLevelItem(0)
+    assert [premiere.text(c) for c in range(3)] == ["09:00–10:00", "Alpha Industrie / Armoire ligne 2 / câblage",
+                                                    "1 h 00"]
+    assert premiere.toolTip(1) == "Alpha Industrie / Armoire ligne 2 / câblage\nbornier X1"
+    assert arbre.topLevelItem(1).text(1) == "Pause  (en cours)"
+    assert panneau.journee.totaux.text() == "Travaillé : 1 h 00      Pause : 0 h 20"
+
+
+def test_inserer_depuis_l_onglet(panneau, moteur, horloge, monkeypatch):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge["t"] = datetime(2026, 11, 17, 11, 0)
+    journee = panneau.journee
+    journee.reinitialiser_plage()
+    journee.debut.setTime(QTime(10, 0))
+    journee.fin.setTime(QTime(10, 30))
+    journee.formulaire.remplir("Gamma Énergie", "Supervision serres", "réunion", "point hebdo")
+    signaux = []
+    journee.etat_change.connect(lambda: signaux.append(1))
+    journee.inserer()
+    lignes = moteur.journal.lire()
+    assert [(l.debut.hour, l.debut.minute, l.client) for l in lignes] == [
+        (9, 0, "Alpha Industrie"), (10, 0, "Gamma Énergie")]
+    assert moteur.ligne_ouverte.debut == datetime(2026, 11, 17, 10, 30)
+    assert signaux == [1]
+    assert journee.formulaire.description.text() == ""
+    assert journee.lignes.topLevelItemCount() == 3
+
+
+def test_inserer_demande_confirmation_si_ligne_remplacee(panneau, moteur, horloge, monkeypatch):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge["t"] = datetime(2026, 11, 17, 9, 30)
+    moteur.pause()
+    horloge["t"] = datetime(2026, 11, 17, 11, 0)
+    journee = panneau.journee
+    journee.reinitialiser_plage()
+    journee.debut.setTime(QTime(9, 0))
+    journee.fin.setTime(QTime(9, 30))
+    journee.formulaire.remplir("Gamma Énergie", "Supervision serres")
+    questions = []
+
+    def repondre(parent, titre, texte):
+        questions.append(texte)
+        return QMessageBox.No
+    monkeypatch.setattr(QMessageBox, "question", repondre)
+    journee.inserer()
+    assert "Alpha Industrie / Armoire ligne 2 09:00 → 09:30" in questions[0]
+    assert moteur.journal.lire()[0].client == "Alpha Industrie"   # refusé : rien n'a changé
+
+    monkeypatch.setattr(QMessageBox, "question", lambda *_: QMessageBox.Yes)
+    journee.inserer()
+    assert moteur.journal.lire()[0].client == "Gamma Énergie"
+
+
+def test_inserer_plage_invalide_message(panneau, moteur, monkeypatch):
+    journee = panneau.journee
+    journee.debut.setTime(QTime(8, 50))
+    journee.fin.setTime(QTime(8, 40))
+    journee.formulaire.remplir("Gamma Énergie", "Supervision serres")
+    messages = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda parent, titre, texte: messages.append(texte))
+    journee.inserer()
+    assert messages == ["L'heure de fin doit être après l'heure de début."]
+    assert moteur.journal.lire() == []

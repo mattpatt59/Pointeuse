@@ -137,6 +137,9 @@ Exemple : on travaille sur le projet A depuis 10:00 ; entre 10:12 et 10:30, on a
 
 - Si la plage recouvre des lignes déjà écrites dans le CSV, celles-ci sont découpées de la même façon. Une ligne entièrement recouverte est remplacée, après confirmation (`Cette plage remplace : A 10:00 → 10:30. Continuer ?`).
 - Une plage dans le futur ou avec une fin avant le début est refusée.
+- Plage proposée par défaut : les 15 dernières minutes d'aujourd'hui (réglage `DUREE_INSERTION_DEFAUT_MIN`), remise à jour à chaque ouverture du panneau.
+- L'insertion est refusée tant que des lignes attendent d'être écrites (CSV ouvert dans Excel) ou si le CSV contient des lignes illisibles (modifiées à la main) : la réécriture les ferait disparaître. Le message dit quoi corriger.
+- **Ordre d'écriture** : le CSV est réécrit d'un bloc (fichier temporaire `pointeuse.csv.tmp`, puis remplacement), ensuite la sauvegarde `pointeuse_en_cours.json` est mise à jour (ligne en cours découpée). Un plantage pendant la réécriture laisse l'ancien CSV intact. Un plantage entre les deux peut, au pire, laisser un chevauchement à la reprise (la ligne en cours repart de son ancien début) — rien n'est perdu, une nouvelle insertion le corrige.
 
 ### Sauvegarde de la tâche en cours et redémarrage après plantage
 
@@ -238,7 +241,7 @@ liste = ["réunion", "administratif"]
 - [x] Step 2 — Moteur de pointage : démarrer / pause / clôture, écriture CSV, mise en attente si le fichier est bloqué
 - [x] Step 3 — Sauvegarde toutes les 5 min + reprise au démarrage
 - [ ] Step 4 — Icône dans la zone de notification + onglet « Pointer » (Windows + Linux) — validé sur poste réel Ubuntu/GNOME (MP 2026-11-17) ; reste à valider sous Windows
-- [ ] Step 5 — Onglet « Insérer / Journée » : insertion avec découpage (tests unitaires sur les cas de recouvrement) + vue de la journée
+- [ ] Step 5 — Onglet « Insérer / Journée » : insertion avec découpage (tests unitaires sur les cas de recouvrement) + vue de la journée — codé et testé hors écran ; reste à valider sur poste réel
 - [ ] Step 6 — Pause automatique : solution de secours sur l'horloge, puis détection propre à chaque OS
 - [ ] Step 7 — Exécutable portable Windows + Linux ; lancement au démarrage de la session (à confirmer)
 
@@ -253,16 +256,17 @@ liste = ["réunion", "administratif"]
 | `src/pointeuse/settings.py` | modifier | Noms de fichiers, colonnes CSV, `PAUSE`, intervalles des minuteurs |
 | `src/pointeuse/chemins.py` | créé | Dossier du programme (exécutable ou dev), vérification de l'écriture |
 | `src/pointeuse/config.py` | créé | Lecture et écriture du TOML (tomlkit) |
-| `src/pointeuse/journal.py` | créé | Lecture / écriture du CSV, lignes d'une journée (découpage des plages : étape 5) |
+| `src/pointeuse/journal.py` | créé | Lecture / écriture du CSV, lignes d'une journée, découpage d'une plage (`decouper`), réécriture atomique (`reecrire`) |
 | `src/pointeuse/moteur.py` | créé | États tâche / pause, file d'attente si CSV bloqué, sauvegarde `pointeuse_en_cours.json`, reprise. L'interface appelle `signe_de_vie()` toutes les 5 min, et toutes les minutes tant que `ecriture_bloquee` |
 | `src/pointeuse/absence.py` | créer | Détection veille / verrouillage (Windows, Linux, secours) |
 | `src/pointeuse/application.py` | créé | Assemblage : icône de notification, menu, minuteurs, verrou une seule instance, reprise au démarrage |
-| `src/pointeuse/panneau.py` | créé | Panneau à deux onglets (« Pointer » fait, « Insérer / Journée » : étape 5) |
+| `src/pointeuse/panneau.py` | créé | Panneau à deux onglets, onglet « Pointer » |
+| `src/pointeuse/onglet_journee.py` | créé | Onglet « Insérer / Journée » : plage date / début / fin, insertion avec confirmation, lignes et totaux du jour |
 | `src/pointeuse/formulaire.py` | créé | Client / Projet / Tâche / Description, commun aux onglets et à la fenêtre d'absence |
 | `src/pointeuse/dialogue_absence.py` | créé | Fenêtre « retour d'absence » (plantage ; veille à l'étape 6) |
 | `src/pointeuse/affichage.py`, `icone.py`, `style.py` | créés | Textes affichés, icône dessinée (verte / grise / orange si CSV bloqué), feuille de style charte |
 | `src/pointeuse/__main__.py` | créé | Point d'entrée (`python -m pointeuse`) |
-| `tests/` | créé | `test_config.py`, `test_journal.py`, `test_moteur.py`, `test_interface.py` (Qt hors écran) ; découpage des plages à l'étape 5 |
+| `tests/` | créé | `test_config.py`, `test_journal.py`, `test_moteur.py`, `test_interface.py` (Qt hors écran), dont les cas de recouvrement de l'insertion |
 
 ### Dépendances
 

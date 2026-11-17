@@ -1,4 +1,4 @@
-"""Panneau ouvert au clic sur l'icône : onglets « Pointer » et « Insérer / Journée »."""
+"""Panneau ouvert au clic sur l'icône : onglets « Pointer » et « Insérer / Journée » (onglet_journee.py)."""
 
 from datetime import datetime
 
@@ -11,6 +11,7 @@ from pointeuse.affichage import duree_texte, minutes_ecoulees, texte_statut
 from pointeuse.config import ConfigInvalide
 from pointeuse.formulaire import FormulaireTache
 from pointeuse.moteur import Moteur
+from pointeuse.onglet_journee import OngletJournee
 
 
 class OngletPointer(QWidget):
@@ -166,9 +167,11 @@ class Panneau(QWidget):
         self.onglets = QTabWidget()
         self.pointer = OngletPointer(moteur, horloge)
         self.onglets.addTab(self.pointer, "Pointer")
-        a_venir = QLabel("Insertion d'un temps à heures fixes et vue de la journée :\nprochaine étape.",
-                         alignment=Qt.AlignCenter)
-        self.onglets.addTab(a_venir, "Insérer / Journée")
+        self.journee = OngletJournee(moteur, horloge)
+        self.onglets.addTab(self.journee, "Insérer / Journée")
+        # Une action dans un onglet se voit tout de suite dans l'autre.
+        self.pointer.etat_change.connect(self.journee.rafraichir)
+        self.journee.etat_change.connect(self.pointer.rafraichir)
 
         disposition = QVBoxLayout(self)
         disposition.setContentsMargins(0, 0, 0, 0)

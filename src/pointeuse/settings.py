@@ -29,12 +29,17 @@ POLICE = "Arial"                        # charte T-Elec §D : app Python → Ari
 TAILLE_POLICE_PT = 10
 LARGEUR_PANNEAU_PX = 400
 TAILLE_ICONE_PX = 64
+HAUTEUR_JOURNEE_PX = 160               # liste des lignes du jour (onglet « Insérer / Journée »)
+LARGEUR_CHAMP_HEURE_PX = 64             # champs « de … à … » de l'onglet « Insérer / Journée »
 LARGEUR_FLECHE_LISTE_PX = 26            # zone cliquable « ⌄ » à droite des listes Client / Projet / Tâche
 DOSSIER_TEMP_STYLE = "pointeuse_style"  # images de la feuille de style, dans le dossier temporaire du système
 MARGE_PANNEAU_PX = 8                    # écart entre l'icône de notification et le panneau (Windows)
 RAFRAICHISSEMENT_AFFICHAGE_S = 30       # mise à jour de l'info-bulle et du chrono
 VERIFICATION_MIN = 1                    # tick : sauvegarde périodique, réessai du CSV bloqué
 DUREE_NOTIFICATION_MS = 8000
+DUREE_INSERTION_DEFAUT_MIN = 15         # plage proposée par défaut dans « Insérer » : les 15 dernières minutes
+FORMAT_DATE_QT = "dd/MM/yyyy"           # champs date / heure de l'onglet « Insérer / Journée »
+FORMAT_HEURE_QT = "HH:mm"
 
 # Charte T-Elec §C
 COULEUR_VERT = "#99CB38"
@@ -44,6 +49,8 @@ COULEUR_VERT_CLAIR = "#f2f9e5"
 COULEUR_NOIR = "#1a1a1a"
 COULEUR_GRIS = "#6b7280"
 COULEUR_BORDURE = "#e5e7eb"
+COULEUR_ENTETE_TABLE = "#e8f0e0"         # charte §E Tables
+COULEUR_BORDURE_TABLE = "#dde8d0"
 COULEUR_BLANC = "#ffffff"
 COULEUR_ORANGE = "#fb8c00"
 COULEUR_ORANGE_CLAIR = "#fff3e0"

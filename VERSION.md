@@ -9,6 +9,7 @@
 - Moteur de pointage sans interface : démarrer / pause / reprendre, écriture de `pointeuse.csv`, file d'attente si le fichier est bloqué (CDC étape 2)
 - Sauvegarde de sécurité `pointeuse_en_cours.json` et reprise après plantage (CDC étape 3)
 - Interface : icône horloge dans la zone de notification, onglet « Pointer », fenêtre « retour d'absence » après plantage, alerte si le CSV est bloqué (CDC étape 4)
+- Onglet « Insérer / Journée » : insertion d'une tâche à heures fixes qui découpe ce qu'elle recouvre (CSV et tâche en cours, confirmation si une ligne est remplacée) ; lignes du jour choisi et totaux travaillé / pause (CDC étape 5)
 
 ### Modifié
 - `pointeuse_config.toml` : format compact `[clients."Nom"]` + un projet par ligne `"Projet" = { taches = [...] }` (remplace `[[clients]]` / `[[clients.projets]]`). La clé `actif` devient `visible` (true par défaut) ; case « Afficher les projets masqués ». Un projet masqué reste utilisable en tapant son nom, sans réapparaître. Fichier existant à convertir une fois à la main — voir `docs/exemples/pointeuse_config.toml`

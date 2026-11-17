@@ -51,22 +51,25 @@ def feuille_de_style() -> str:
                      padding: 8px 12px; border-radius: 4px; }}
     QLabel[etiquette="true"] {{ color: {s.COULEUR_GRIS}; }}
 
-    QComboBox, QLineEdit {{ border: 1px solid {s.COULEUR_BORDURE}; border-radius: 6px;
+    QComboBox, QLineEdit, QDateEdit, QTimeEdit {{ border: 1px solid {s.COULEUR_BORDURE}; border-radius: 6px;
                             padding: 5px 8px; background: {s.COULEUR_BLANC}; min-height: 20px; }}
-    QComboBox {{ padding-right: {s.LARGEUR_FLECHE_LISTE_PX + 4}px; }}
-    QComboBox:focus, QLineEdit:focus {{ border-color: {s.COULEUR_VERT_FONCE}; }}
+    QComboBox, QDateEdit {{ padding-right: {s.LARGEUR_FLECHE_LISTE_PX + 4}px; }}
+    /* Heures : saisie au clavier ou à la molette, sans les petites flèches.
+       (setButtonSymbols(NoButtons) réduit le texte à 1 px avec une feuille de style.) */
+    QTimeEdit::up-button, QTimeEdit::down-button {{ width: 0px; border: none; }}
+    QComboBox:focus, QLineEdit:focus, QDateEdit:focus, QTimeEdit:focus {{ border-color: {s.COULEUR_VERT_FONCE}; }}
     QComboBox:hover {{ border-color: {s.COULEUR_VERT}; }}
 
     /* Zone de la flèche : bien visible, comme un <select> web */
-    QComboBox::drop-down {{
+    QComboBox::drop-down, QDateEdit::drop-down {{
         subcontrol-origin: padding; subcontrol-position: center right;
         width: {s.LARGEUR_FLECHE_LISTE_PX}px; border: none;
         border-left: 1px solid {s.COULEUR_BORDURE};
         border-top-right-radius: 6px; border-bottom-right-radius: 6px;
         background: {s.COULEUR_VERT_CLAIR};
     }}
-    QComboBox::down-arrow {{ image: url("{chevron}"); width: 12px; height: 8px; }}
-    QComboBox::down-arrow:hover, QComboBox::down-arrow:on {{ image: url("{chevron_survol}"); }}
+    QComboBox::down-arrow, QDateEdit::down-arrow {{ image: url("{chevron}"); width: 12px; height: 8px; }}
+    QComboBox::down-arrow:hover, QComboBox::down-arrow:on, QDateEdit::down-arrow:hover {{ image: url("{chevron_survol}"); }}
 
     /* Liste dépliée */
     QComboBox QAbstractItemView {{
@@ -83,5 +86,13 @@ def feuille_de_style() -> str:
     QPushButton:disabled {{ background: {s.COULEUR_BORDURE}; color: {s.COULEUR_GRIS}; }}
 
     QCheckBox, QRadioButton {{ color: {s.COULEUR_GRIS}; }}
+
+    /* Onglet « Insérer / Journée » : tableau selon la charte (§E Tables) */
+    QLabel#titre_journee {{ color: {s.COULEUR_VERT_PROFOND}; font-weight: bold; padding-top: 6px;
+                            border-top: 1px solid {s.COULEUR_BORDURE}; }}
+    QTreeWidget {{ border: 1px solid {s.COULEUR_BORDURE_TABLE}; border-radius: 6px; }}
+    QHeaderView::section {{ background: {s.COULEUR_ENTETE_TABLE}; color: {s.COULEUR_VERT_PROFOND};
+                            font-weight: bold; border: none; padding: 4px 6px; }}
+    QLabel#totaux {{ font-weight: bold; color: {s.COULEUR_VERT_PROFOND}; }}
     QRadioButton {{ font-weight: bold; color: {s.COULEUR_NOIR}; }}
     """

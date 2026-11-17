@@ -94,3 +94,56 @@ def test_ecriture_impossible(tmp_path):
 def test_liste_vide_ne_cree_rien(journal):
     journal.ajouter([])
     assert not journal.chemin.exists()
+
+
+# ─── Insertion d'un temps : découpage et réécriture (étape 5) ───────────────
+
+from pointeuse.journal import decouper  # noqa: E402
+
+L_9_12 = Ligne(h("2026-11-17 09:00"), h("2026-11-17 12:00"), "A", "X")
+
+
+def test_decouper_ligne_qui_contient_la_plage():
+    restantes, recouvertes = decouper([L_9_12], h("2026-11-17 10:00"), h("2026-11-17 10:30"))
+    assert [(l.debut, l.fin) for l in restantes] == [(h("2026-11-17 09:00"), h("2026-11-17 10:00")),
+                                                     (h("2026-11-17 10:30"), h("2026-11-17 12:00"))]
+    assert recouvertes == []
+
+
+def test_decouper_lignes_a_cheval_et_recouverte():
+    avant = Ligne(h("2026-11-17 08:00"), h("2026-11-17 09:30"), "A", "X")
+    dedans = Ligne(h("2026-11-17 09:30"), h("2026-11-17 10:00"), "B", "Y")
+    apres = Ligne(h("2026-11-17 10:00"), h("2026-11-17 11:00"), "A", "X")
+    loin = Ligne(h("2026-11-17 14:00"), h("2026-11-17 15:00"), "A", "X")
+    restantes, recouvertes = decouper([avant, dedans, apres, loin], h("2026-11-17 09:00"), h("2026-11-17 10:15"))
+    assert [(l.debut.strftime("%H:%M"), l.fin.strftime("%H:%M")) for l in restantes] == [
+        ("08:00", "09:00"), ("10:15", "11:00"), ("14:00", "15:00")]
+    assert recouvertes == [dedans]
+
+
+def test_decouper_lignes_bord_a_bord_intactes():
+    restantes, recouvertes = decouper([L_9_12], h("2026-11-17 12:00"), h("2026-11-17 12:30"))
+    assert restantes == [L_9_12] and recouvertes == []
+
+
+def test_reecrire_trie_et_garde_bom_et_en_tete(journal):
+    journal.ajouter([LIGNE_B])
+    journal.reecrire([LIGNE_B, LIGNE_A])
+    brut = journal.chemin.read_bytes()
+    assert brut.count(b"\xef\xbb\xbf") == 1
+    assert brut.decode("utf-8-sig").count("date_in") == 1
+    assert journal.lire() == [LIGNE_A, LIGNE_B]
+    assert not journal.chemin.with_name("pointeuse.csv.tmp").exists()
+
+
+def test_reecrire_bloque_laisse_le_fichier_intact(journal, monkeypatch):
+    journal.ajouter([LIGNE_A])
+    avant = journal.chemin.read_bytes()
+
+    def refuse(*_):
+        raise PermissionError("fichier ouvert dans Excel")
+    monkeypatch.setattr("pointeuse.journal.os.replace", refuse)
+    with pytest.raises(JournalBloque):
+        journal.reecrire([LIGNE_B])
+    assert journal.chemin.read_bytes() == avant
+    assert not journal.chemin.with_name("pointeuse.csv.tmp").exists()

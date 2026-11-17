@@ -13,13 +13,13 @@ sauvegarde et rend l'Absence à faire qualifier par l'utilisateur.
 import json
 import os
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Callable
 
 from pointeuse import settings
 from pointeuse.config import Config
-from pointeuse.journal import Journal, JournalBloque, Ligne, a_la_minute
+from pointeuse.journal import Journal, JournalBloque, Ligne, a_la_minute, decouper
 
 VERSION_EN_COURS = 1
 
@@ -61,6 +61,10 @@ class LigneOuverte:
             tache=d.get("tache", ""),
             description=d.get("description", ""),
         )
+
+
+class InsertionImpossible(ValueError):
+    """Plage refusée (dans le futur, fin avant début) ou CSV pas en état d'être réécrit."""
 
 
 @dataclass(frozen=True)
@@ -162,6 +166,72 @@ class Moteur:
         if ligne.duree_min > 0:
             self.en_attente.append(ligne)
         self._ecrire_et_sauvegarder()
+
+    # ─── Insertion d'un temps défini (onglet « Insérer / Journée ») ──────────
+
+    def verifier_insertion(self, debut: datetime, fin: datetime) -> list[Ligne]:
+        """Contrôle la plage et retourne les lignes du CSV qu'elle remplacerait entièrement.
+
+        L'interface demande confirmation si la liste n'est pas vide. Lève InsertionImpossible.
+        """
+        debut, fin = a_la_minute(debut), a_la_minute(fin)
+        _, recouvertes = decouper(self._lignes_pour_insertion(debut, fin), debut, fin)
+        return recouvertes
+
+    def inserer(self, debut: datetime, fin: datetime, client: str, projet: str,
+                tache: str | None = None, description: str = "") -> None:
+        """Insère une tâche de debut à fin : elle découpe ce qu'elle recouvre (CSV et ligne en cours).
+
+        Le CSV est réécrit d'un bloc (écriture atomique), puis l'état est sauvegardé.
+        Lève InsertionImpossible, ValueError (noms) ou JournalBloque : rien n'est alors modifié
+        dans le CSV ni dans la ligne en cours.
+        """
+        debut, fin = a_la_minute(debut), a_la_minute(fin)
+        lignes = self._lignes_pour_insertion(debut, fin)
+        client, projet, tache = self.config.ajouter(client, projet, tache)
+        if tache is None:
+            tache = ""
+        restantes, _ = decouper(lignes, debut, fin)
+        a_ajouter = [Ligne(debut, fin, client, projet, tache, description.strip())]
+
+        # La ligne en cours est découpée aussi : sa partie avant la plage est clôturée,
+        # elle reprend à la fin de la plage.
+        ouverte = self.ligne_ouverte
+        if ouverte is not None and ouverte.debut < fin:
+            if ouverte.debut < debut:
+                a_ajouter.append(ouverte.fermer(debut))
+            ouverte = replace(ouverte, debut=fin)
+
+        self.journal.reecrire(restantes + a_ajouter)
+        self.ligne_ouverte = ouverte
+        self.derniere_erreur = ""
+        self.sauvegarder()
+
+    def lignes_du_jour(self, jour: date) -> list[Ligne]:
+        """Lignes terminées qui touchent ce jour : CSV + lignes en attente, triées."""
+        debut_jour = datetime.combine(jour, datetime.min.time())
+        fin_jour = debut_jour + timedelta(days=1)
+        lignes = self.journal.lignes_du_jour(jour)
+        for ligne in self.en_attente:
+            if ligne.debut < fin_jour and ligne.fin > debut_jour:
+                lignes.append(ligne)
+        return sorted(lignes, key=lambda l: l.debut)
+
+    def _lignes_pour_insertion(self, debut: datetime, fin: datetime) -> list[Ligne]:
+        """Valide la plage et l'état du CSV ; retourne les lignes actuelles du CSV."""
+        if fin <= debut:
+            raise InsertionImpossible("L'heure de fin doit être après l'heure de début.")
+        if fin > self._maintenant():
+            raise InsertionImpossible("Impossible d'insérer un temps dans le futur.")
+        if self.en_attente:
+            raise InsertionImpossible(f"{len(self.en_attente)} ligne(s) attendent d'être écrites : "
+                                      f"fermez {self.journal.chemin.name} puis réessayez.")
+        lignes = self.journal.lire()
+        if self.journal.lignes_ignorees > 0:
+            # Réécrire le fichier ferait disparaître ces lignes : on laisse l'utilisateur corriger.
+            raise InsertionImpossible(f"{self.journal.lignes_ignorees} ligne(s) illisible(s) dans "
+                                      f"{self.journal.chemin.name} : corrigez-les avant d'insérer.")
+        return lignes
 
     # ─── Sauvegarde de sécurité et reprise ───────────────────────────────────
 

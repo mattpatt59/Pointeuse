@@ -4,7 +4,8 @@ Une ligne = une tâche ou une pause terminée. Les heures sont à la minute.
 """
 
 import csv
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -84,6 +85,30 @@ class Ligne:
         )
 
 
+def decouper(lignes: list[Ligne], debut: datetime, fin: datetime) -> tuple[list[Ligne], list[Ligne]]:
+    """Retire la plage [debut, fin] des lignes (CDC « Insérer un temps défini »).
+
+    Une ligne à cheval sur la plage est raccourcie ; une ligne qui la contient est
+    coupée en deux. Retourne (lignes restantes, lignes entièrement recouvertes).
+    """
+    restantes = []
+    recouvertes = []
+    for ligne in lignes:
+        if ligne.fin <= debut or ligne.debut >= fin:
+            restantes.append(ligne)
+            continue
+        morceaux = []
+        if ligne.debut < debut:
+            morceaux.append(replace(ligne, fin=debut))
+        if ligne.fin > fin:
+            morceaux.append(replace(ligne, debut=fin))
+        if morceaux:
+            restantes.extend(morceaux)
+        else:
+            recouvertes.append(ligne)
+    return restantes, recouvertes
+
+
 class Journal:
     """Accès au fichier pointeuse.csv."""
 
@@ -142,3 +167,23 @@ class Journal:
                     ecrivain.writerow(ligne.vers_csv())
         except OSError as erreur:
             raise JournalBloque(f"Impossible d'écrire dans {self.chemin.name} : {erreur}") from erreur
+
+    def reecrire(self, lignes: list[Ligne]) -> None:
+        """Remplace tout le fichier (insertion d'un temps), trié par heure de début.
+
+        Écriture atomique : fichier temporaire puis remplacement. Un plantage laisse
+        l'ancien fichier intact. Lève JournalBloque si le fichier ne peut pas être
+        remplacé (ouvert dans Excel sous Windows, par exemple).
+        """
+        temporaire = self.chemin.with_name(self.chemin.name + ".tmp")
+        try:
+            self.chemin.parent.mkdir(parents=True, exist_ok=True)
+            with open(temporaire, "w", newline="", encoding=settings.ENCODAGE_CSV) as fichier:
+                ecrivain = csv.writer(fichier, delimiter=settings.SEPARATEUR_CSV)
+                ecrivain.writerow(settings.COLONNES_CSV)
+                for ligne in sorted(lignes, key=lambda l: l.debut):
+                    ecrivain.writerow(ligne.vers_csv())
+            os.replace(temporaire, self.chemin)
+        except OSError as erreur:
+            temporaire.unlink(missing_ok=True)
+            raise JournalBloque(f"Impossible de réécrire {self.chemin.name} : {erreur}") from erreur

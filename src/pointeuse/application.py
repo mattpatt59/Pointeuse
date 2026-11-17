@@ -30,6 +30,7 @@ class Application:
 
         self.panneau = Panneau(moteur)
         self.panneau.pointer.etat_change.connect(self.mettre_a_jour)
+        self.panneau.journee.etat_change.connect(self.mettre_a_jour)
 
         self.icone = QSystemTrayIcon()
         self.icone.activated.connect(self._icone_activee)
@@ -82,6 +83,7 @@ class Application:
         self.icone.setIcon(icone_etat(en_cours, moteur.ecriture_bloquee))
         self.icone.setToolTip(texte_info_bulle(moteur.ligne_ouverte, datetime.now(), len(moteur.en_attente)))
         self.panneau.pointer.rafraichir()
+        self.panneau.journee.rafraichir()
         if moteur.ecriture_bloquee and not self.bloque_signale:
             self.bloque_signale = True
             self.icone.showMessage(settings.NOM_APPLICATION,
@@ -123,6 +125,8 @@ class Application:
             QMessageBox.warning(None, settings.NOM_APPLICATION, str(erreur))
         self.panneau.pointer.formulaire.recharger()
         self.panneau.pointer.rafraichir()
+        self.panneau.journee.formulaire.recharger()
+        self.panneau.journee.reinitialiser_plage()
         self.panneau.adjustSize()
         self._placer_panneau()
         self.panneau.show()

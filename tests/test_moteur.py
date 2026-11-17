@@ -330,3 +330,126 @@ def test_plantage_entre_csv_et_json_pas_de_doublon(dossier, horloge):
     relance = nouveau_moteur(dossier, horloge)
     relance.reprendre_apres_arret()
     assert resume(relance) == [("09:00", "10:00", "Alpha Industrie", "Armoire ligne 2", "", "")]
+
+
+# ─── Insérer un temps défini (étape 5) ───────────────────────────────────────
+
+from pointeuse.moteur import InsertionImpossible  # noqa: E402
+
+
+def a(heure: str) -> datetime:
+    heures, minutes = heure.split(":")
+    return datetime(2026, 11, 17, int(heures), int(minutes))
+
+
+def test_inserer_dans_une_ligne_terminee(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2", "câblage")
+    horloge.regler("12:00")
+    moteur.pause()
+    moteur.inserer(a("10:00"), a("10:30"), "Bêta Automatismes", "Carte capteur v2", "schéma", "appel")
+    assert resume(moteur) == [
+        ("08:00", "10:00", "Alpha Industrie", "Armoire ligne 2", "câblage", ""),
+        ("10:00", "10:30", "Bêta Automatismes", "Carte capteur v2", "schéma", "appel"),
+        ("10:30", "12:00", "Alpha Industrie", "Armoire ligne 2", "câblage", ""),
+    ]
+    assert moteur.en_pause
+
+
+def test_inserer_decoupe_la_ligne_en_cours(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("09:00")
+    moteur.inserer(a("08:45"), a("09:00"), "Gamma Énergie", "Supervision serres", "réunion")
+    assert resume(moteur) == [
+        ("08:00", "08:45", "Alpha Industrie", "Armoire ligne 2", "", ""),
+        ("08:45", "09:00", "Gamma Énergie", "Supervision serres", "réunion", ""),
+    ]
+    assert moteur.ligne_ouverte.debut == a("09:00")
+    assert moteur.ligne_ouverte.projet == "Armoire ligne 2"
+    # l'état sauvegardé suit : un plantage ne réécrirait pas 08:00 → …
+    etat = json.loads(moteur.chemin_en_cours.read_text(encoding="utf-8"))
+    assert etat["ligne_ouverte"]["debut"] == "2026-11-17T09:00:00"
+
+
+def test_inserer_avant_la_ligne_en_cours_ne_la_touche_pas(moteur, horloge):
+    horloge.regler("10:00")
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("11:00")
+    moteur.inserer(a("08:00"), a("09:00"), "Gamma Énergie", "Supervision serres")
+    assert len(resume(moteur)) == 1
+    assert moteur.ligne_ouverte.debut == a("10:00")
+
+
+def test_inserer_remplace_et_verifier_le_signale(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("08:30")
+    moteur.demarrer("Gamma Énergie", "Supervision serres")
+    horloge.regler("09:00")
+    moteur.pause()
+    remplacees = moteur.verifier_insertion(a("08:00"), a("08:30"))
+    assert [(l.client, l.debut) for l in remplacees] == [("Alpha Industrie", a("08:00"))]
+    moteur.inserer(a("08:00"), a("08:30"), "Bêta Automatismes", "Firmware passerelle")
+    assert [l[2] for l in resume(moteur)] == ["Bêta Automatismes", "Gamma Énergie"]
+
+
+def test_inserer_nouveau_nom_ajoute_a_la_config(moteur, horloge):
+    horloge.regler("10:00")
+    moteur.inserer(a("09:00"), a("09:30"), "alpha industrie", "Nouveau projet", "essai")
+    assert resume(moteur)[0][2:5] == ("Alpha Industrie", "Nouveau projet", "essai")
+    assert "Nouveau projet" in moteur.config.projets("Alpha Industrie")
+
+
+@pytest.mark.parametrize("debut, fin, message", [
+    ("09:30", "09:30", "après"),
+    ("09:30", "09:00", "après"),
+    ("09:30", "10:30", "futur"),
+])
+def test_inserer_plage_refusee(moteur, horloge, debut, fin, message):
+    horloge.regler("10:00")
+    with pytest.raises(InsertionImpossible, match=message):
+        moteur.inserer(a(debut), a(fin), "Alpha Industrie", "Armoire ligne 2")
+    assert resume(moteur) == []
+
+
+def test_inserer_refuse_si_lignes_en_attente(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    moteur.journal.verrouille = True
+    horloge.regler("09:00")
+    moteur.pause()
+    with pytest.raises(InsertionImpossible, match="attendent"):
+        moteur.inserer(a("08:00"), a("08:30"), "Gamma Énergie", "Supervision serres")
+    assert len(moteur.en_attente) == 1
+
+
+def test_inserer_refuse_si_lignes_illisibles(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("09:00")
+    moteur.pause()
+    with open(moteur.journal.chemin, "a", encoding="utf-8") as f:
+        f.write("ligne abîmée à la main\n")
+    avant = moteur.journal.chemin.read_bytes()
+    with pytest.raises(InsertionImpossible, match="illisible"):
+        moteur.inserer(a("08:00"), a("08:30"), "Gamma Énergie", "Supervision serres")
+    assert moteur.journal.chemin.read_bytes() == avant
+
+
+def test_inserer_csv_bloque_rien_ne_change(moteur, horloge, monkeypatch):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("09:00")
+    ouverte = moteur.ligne_ouverte
+
+    def bloque(lignes):
+        raise JournalBloque("fichier verrouillé")
+    monkeypatch.setattr(moteur.journal, "reecrire", bloque)
+    with pytest.raises(JournalBloque):
+        moteur.inserer(a("08:30"), a("08:45"), "Gamma Énergie", "Supervision serres")
+    assert moteur.ligne_ouverte == ouverte
+
+
+def test_lignes_du_jour_inclut_les_lignes_en_attente(moteur, horloge):
+    moteur.demarrer("Alpha Industrie", "Armoire ligne 2")
+    horloge.regler("09:00")
+    moteur.demarrer("Gamma Énergie", "Supervision serres")
+    moteur.journal.verrouille = True
+    horloge.regler("10:00")
+    moteur.pause()
+    assert [l.client for l in moteur.lignes_du_jour(a("00:00").date())] == ["Alpha Industrie", "Gamma Énergie"]
