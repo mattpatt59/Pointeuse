@@ -2,6 +2,9 @@
 
 ## [Non publié]
 
+### Modifié
+- GitHub Actions : actions passées en Node.js 24 (`checkout@v7`, `setup-python@v7`, `upload-artifact@v7`, `download-artifact@v8`), Node.js 20 étant déprécié sur les runners
+
 ## [0.1.0] - 2026-11-17
 
 Première version diffusée (les tags `v0.1.0` et `V0.1.1` précédents n'ont été distribués à personne et sont remplacés).
