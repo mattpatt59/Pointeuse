@@ -2,7 +2,7 @@
 
 **Date demande :** 2026-11-17
 **Date création :** 2026-11-17
-**Statut :** PARTIELLEMENT IMPLÉMENTÉ
+**Statut :** IMPLÉMENTÉ
 
 ---
 
@@ -106,8 +106,8 @@ sans projet, clé inconnue, valeur qui n'est pas un texte, plus de 8 boutons.
 - [x] Step 1 — Moteur : `modifier()`, `pause(description)`, `demarrer(..., projet_obligatoire=False)` ; Stop = `arreter()`
 - [x] Step 2 — Config : `[[raccourcis]]` (lecture, contrôles), `ajouter(..., projet_obligatoire=False)`, deux boutons d'exemple dans le fichier par défaut
 - [x] Step 3 — Interface : deux lignes de boutons, boutons rapides, projet en rouge — vérifié par capture hors écran
-- [ ] Step 4 — Validation sur poste réel (Linux, Windows)
-- [ ] Step 5 — Doc utilisateur (`docs/user/`) une fois implémenté
+- [x] Step 4 — Validation sur poste réel (Linux, Windows) — MP 2026-11-18
+- [x] Step 5 — Doc utilisateur : `docs/user/onglet_pointer.md`
 
 ---
 

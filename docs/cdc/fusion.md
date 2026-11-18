@@ -2,7 +2,7 @@
 
 **Date demande :** 2026-11-17
 **Date création :** 2026-11-17
-**Statut :** PARTIELLEMENT IMPLÉMENTÉ
+**Statut :** IMPLÉMENTÉ
 
 ---
 
@@ -98,8 +98,8 @@ Dès qu'un temps du secondaire est retiré, le lecteur **prévient** (MP 2026-11
 
 - [x] Step 1 — Pauses du principal : elles cèdent au travail du secondaire (MP 2026-11-17)
 - [x] Step 2 — Algorithme de fusion en JS (`lecteur/fusion.js`, fonctions pures : principal, secondaire → lignes gardées + lignes retirées), testé sur les cas de recouvrement par `tests/test_fusion.py` avec le moteur JS de Qt (`QJSEngine`, déjà dans PySide6 : pas de `node`)
-- [~] Step 3 — Lecteur (fait, vérifié par capture headless ; reste à valider sur poste réel) : choix du PC principal, bandeau d'avertissement + rapport, export du CSV fusionné ; texte « Plusieurs fichiers sont additionnés » remplacé
-- [ ] Step 4 — Doc utilisateur (`docs/user/`) une fois implémenté
+- [x] Step 3 — Lecteur (validé sur poste réel, MP 2026-11-18) : choix du PC principal, bandeau d'avertissement + rapport, export du CSV fusionné ; texte « Plusieurs fichiers sont additionnés » remplacé
+- [x] Step 4 — Doc utilisateur : `docs/user/fusion.md`
 
 ---
 

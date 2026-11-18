@@ -97,6 +97,7 @@ Fichier commenté complet : [docs/exemples/pointeuse_config.toml](docs/exemples/
 
 ## Pour aller plus loin
 
+- Guide d'utilisation : [docs/user/pointeuse.md](docs/user/pointeuse.md)
 - Spécification : [docs/cdc/pointeuse.md](docs/cdc/pointeuse.md)
 - Vue d'ensemble du projet et développement : [docs/readme.md](docs/readme.md)
 - Historique des versions : [VERSION.md](VERSION.md)

@@ -2,6 +2,9 @@
 
 ## [Non publié]
 
+### Ajouté
+- Doc utilisateur `docs/user/` : guide général (`pointeuse.md`), onglet Pointer, fusion des CSV de plusieurs PC
+
 ### Modifié
 - GitHub Actions : actions passées en Node.js 24 (`checkout@v7`, `setup-python@v7`, `upload-artifact@v7`, `download-artifact@v8`), Node.js 20 étant déprécié sur les runners
 

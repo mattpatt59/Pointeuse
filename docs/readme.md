@@ -53,20 +53,21 @@ python3 -m venv .venv
 ## État d'avancement
 
 - [x] Initialisation du projet
-- [x] CDC principal (`docs/cdc/pointeuse.md`, statut PARTIELLEMENT IMPLÉMENTÉ)
+- [x] CDC principal (`docs/cdc/pointeuse.md`, statut IMPLÉMENTÉ)
 - [x] ADR 001 — choix du toolkit UI (PySide6)
 - [x] ADR 002 — exécutable « onedir » + GitHub Actions
 - [x] Étape 1 — config TOML au format compact (`config.py`, 42 tests)
 - [x] Étapes 2 et 3 — moteur, CSV, sauvegarde et reprise (`journal.py`, `moteur.py`)
-- [~] Étape 4 — icône + onglet « Pointer » + fenêtre d'absence (15 tests hors écran) ; validé sous Ubuntu/GNOME, reste Windows
-- [~] Étape 5 — onglet « Insérer / Journée » (`onglet_journee.py`) : insertion avec découpage, journée et totaux ; reste à valider sur poste réel
-- [~] Étape 6 — pause automatique (`absence.py`) : relevé d'horloge de secours, D-Bus sous Linux, messages de session sous Windows ; reste à valider sur poste réel
-- [~] Étape 7 — exécutable portable (`outils/construire.py`), lancement à l'ouverture de session (`demarrage_auto.py`), CI GitHub Actions ; exécutable Linux vérifié en local, reste Windows et le premier passage de la CI
-- [~] Étape 8 — absence longue sans question, journal des événements (`evenements.py`), moments non pointés dans la vue Journée ; reste à valider sur poste réel
-- [~] Bilan : fusion de plusieurs fichiers autour d'un PC principal (`lecteur/fusion.js`, CDC `fusion.md`) ; pauses du principal tranchées (elles cèdent au travail du secondaire) ; reste à valider sur poste réel
-- [~] Onglet « Pointer » : Modifier, Stop, Repas, boutons rapides `[[raccourcis]]` (CDC `onglet_pointer.md`) ; reste à valider sur poste réel
-- [~] Onglet « À propos » : version, lien du dépôt GitHub, licences, présentation T-Elec — 220 tests au total
+- [x] Étape 4 — icône + onglet « Pointer » + fenêtre d'absence (15 tests hors écran)
+- [x] Étape 5 — onglet « Insérer / Journée » (`onglet_journee.py`) : insertion avec découpage, journée et totaux
+- [x] Étape 6 — pause automatique (`absence.py`) : relevé d'horloge de secours, D-Bus sous Linux, messages de session sous Windows
+- [x] Étape 7 — exécutable portable (`outils/construire.py`), lancement à l'ouverture de session (`demarrage_auto.py`), CI GitHub Actions
+- [x] Étape 8 — absence longue sans question, journal des événements (`evenements.py`), moments non pointés dans la vue Journée
+- [x] Bilan : fusion de plusieurs fichiers autour d'un PC principal (`lecteur/fusion.js`, CDC `fusion.md`) ; pauses du principal tranchées (elles cèdent au travail du secondaire)
+- [x] Onglet « Pointer » : Modifier, Stop, Repas, boutons rapides `[[raccourcis]]` (CDC `onglet_pointer.md`)
+- [x] Onglet « À propos » : version, lien du dépôt GitHub, licences, présentation T-Elec — 220 tests au total
 - [x] Version 0.1.0 publiée (première version diffusée : tout ce qui précède, README illustré)
+- [x] Validation sur poste réel Linux et Windows (2026-11-18) : CDC `pointeuse.md`, `onglet_pointer.md`, `fusion.md` passés IMPLÉMENTÉ ; doc utilisateur dans `docs/user/`
 
 ## Déploiement
 

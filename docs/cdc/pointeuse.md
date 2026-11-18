@@ -2,7 +2,7 @@
 
 **Date demande :** 2026-11-17
 **Date création :** 2026-11-17
-**Statut :** PARTIELLEMENT IMPLÉMENTÉ
+**Statut :** IMPLÉMENTÉ
 
 ---
 
@@ -265,7 +265,6 @@ detection_absence_min = 2   # saut d'horloge considéré comme une veille
 absence_longue_h = 4        # au-delà (ou si le jour change) : pas de question au retour
 retention_journal_jours = 90  # durée de conservation du journal des événements (0 = pas de journal)
 afficher_journal = true     # vue Journée : événements et trous visibles (case « Masquer le journal »)
-  — fait (179 tests), reste à valider sur poste réel
 
 [clients."exemple-client"]
 "projet-x" = { taches = ["cdc", "routage", "tests"] }   # tâches propres au projet
@@ -309,11 +308,11 @@ liste = ["réunion", "administratif"]
 - [x] Step 1 — Config TOML : lecture, création par défaut, ajout d'entrées, relecture à chaud
 - [x] Step 2 — Moteur de pointage : démarrer / pause / clôture, écriture CSV, mise en attente si le fichier est bloqué
 - [x] Step 3 — Sauvegarde toutes les 5 min + reprise au démarrage
-- [ ] Step 4 — Icône dans la zone de notification + onglet « Pointer » (Windows + Linux) — validé sur poste réel Ubuntu/GNOME (MP 2026-11-17) ; reste à valider sous Windows
-- [ ] Step 5 — Onglet « Insérer / Journée » : insertion avec découpage (tests unitaires sur les cas de recouvrement) + vue de la journée — codé et testé hors écran ; reste à valider sur poste réel
-- [ ] Step 6 — Pause automatique : solution de secours sur l'horloge, puis détection propre à chaque OS — codé et testé ; D-Bus vérifié sous Ubuntu ; reste à valider sur poste réel (veille / verrouillage Linux et Windows)
-- [ ] Step 7 — Exécutable portable Windows + Linux (ADR 002, construit par GitHub Actions) ; lancement à l'ouverture de session (option du menu) — exécutable Linux vérifié en local ; reste la CI réelle et l'exécutable Windows
-- [~] Step 8 — Absence longue sans question (tâche et pause clôturées au départ, même règle après plantage) + journal des événements (écriture, rétention, purge au démarrage) + vue Journée (événements, trous cliquables, « Masquer le journal ») — code et tests faits, reste à valider sur poste réel
+- [x] Step 4 — Icône dans la zone de notification + onglet « Pointer » (Windows + Linux) — validé sur poste réel Linux et Windows (MP 2026-11-18)
+- [x] Step 5 — Onglet « Insérer / Journée » : insertion avec découpage (tests unitaires sur les cas de recouvrement) + vue de la journée — validé sur poste réel Linux et Windows (MP 2026-11-18)
+- [x] Step 6 — Pause automatique : solution de secours sur l'horloge, puis détection propre à chaque OS (veille / verrouillage) — validé sur poste réel Linux et Windows (MP 2026-11-18)
+- [x] Step 7 — Exécutable portable Windows + Linux (ADR 002, construit par GitHub Actions, release v0.1.0) ; lancement à l'ouverture de session (option du menu) — validé sur poste réel Linux et Windows (MP 2026-11-18)
+- [x] Step 8 — Absence longue sans question (tâche et pause clôturées au départ, même règle après plantage) + journal des événements (écriture, rétention, purge au démarrage) + vue Journée (événements, trous cliquables, « Masquer le journal ») — validé sur poste réel Linux et Windows (MP 2026-11-18)
 
 ---
 
