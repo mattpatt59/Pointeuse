@@ -1,11 +1,12 @@
 # Nom : essai_executable.py
 # Usage : python outils/essai_executable.py — après outils/construire.py.
-#         Lance l'exécutable hors écran 5 s : il doit tenir et créer sa config à côté de lui.
+#         Lance l'exécutable hors écran 5 s : il doit tenir et créer sa config dans data/ à côté de lui.
 #         Utilisé par GitHub Actions ; marche aussi en local.
-# Date : 2026-11-17
+# Date : 2026-11-17 (data/ : 2026-11-20)
 """Essai de fumée de l'exécutable construit (CDC étape 7)."""
 
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -17,8 +18,6 @@ sys.path.insert(0, str(RACINE / "src"))
 from pointeuse import settings  # noqa: E402
 
 DUREE_ESSAI_S = 5
-FICHIERS_CREES = [settings.NOM_FICHIER_CONFIG, settings.NOM_FICHIER_EN_COURS, settings.NOM_FICHIER_VERROU,
-                  settings.NOM_FICHIER_CSV]
 
 
 def main() -> int:
@@ -38,17 +37,19 @@ def main() -> int:
     if code is None:
         processus.kill()
         processus.wait()
-    config_creee = (dossier / settings.NOM_FICHIER_CONFIG).exists()
-    for nom_fichier in FICHIERS_CREES:   # ne pas laisser de données d'essai dans dist/
-        (dossier / nom_fichier).unlink(missing_ok=True)
+    # Données dans data/, verrou à côté de l'exécutable (ADR 005).
+    donnees = dossier / settings.NOM_DOSSIER_DONNEES
+    config_creee = (donnees / settings.NOM_FICHIER_CONFIG).exists()
+    shutil.rmtree(donnees, ignore_errors=True)   # ne pas laisser de données d'essai dans dist/
+    (dossier / settings.NOM_FICHIER_VERROU).unlink(missing_ok=True)
 
     if code is not None:
         print(f"L'exécutable s'est arrêté au bout de moins de {DUREE_ESSAI_S} s (code {code}).")
         return 1
     if not config_creee:
-        print(f"{settings.NOM_FICHIER_CONFIG} n'a pas été créé à côté de l'exécutable.")
+        print(f"{settings.NOM_FICHIER_CONFIG} n'a pas été créé dans {donnees}.")
         return 1
-    print(f"OK : l'exécutable tourne et a créé {settings.NOM_FICHIER_CONFIG}.")
+    print(f"OK : l'exécutable tourne et a créé {settings.NOM_DOSSIER_DONNEES}/{settings.NOM_FICHIER_CONFIG}.")
     return 0
 
 
