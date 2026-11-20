@@ -45,6 +45,17 @@ LIBELLE_TERMINE_A_CONFIRMER = "terminé ?"
 PRIORITE_MIN = -99                       # le plus urgent
 PRIORITE_MAX = 99
 PRIORITE_DEFAUT = 0
+STATUT_NOUVELLE_NOTE = "en_cours"        # statut proposé pour un projet qui n'a encore aucune note
+# Réglages par défaut de la section [suivi] du fichier de config.
+SUIVI_DEFAUT = {
+    "periode_note": PERIODE_JOUR,        # une note par jour ou par semaine
+    "rappel_au_stop": True,              # au Stop : proposer la note du projet arrêté
+}
+# Fenêtre « Suivi »
+LARGEUR_FENETRE_SUIVI_PX = 1100
+HAUTEUR_FENETRE_SUIVI_PX = 640
+LARGEUR_LISTE_SUIVI_PX = 460
+LONGUEUR_EXTRAIT_NOTE = 80               # historique : début de la note affiché (caractères)
 
 # ─── Pointage ────────────────────────────────────────────────────────────────
 # Nom de client réservé aux lignes de pause : interdit pour un vrai client.
@@ -68,7 +79,7 @@ HAUTEUR_LOGO_A_PROPOS_PX = 56
 NOM_DOSSIER_BILAN = "bilan"
 NOM_FICHIER_DONNEES_BILAN = "pointeuse_donnees_tmp.js"
 MARQUEUR_DONNEES_BILAN = "<!-- POINTEUSE:DONNEES -->"
-VERSION_DONNEES_BILAN = 1   # = DONNEES_LOCALES_VERSION dans lecteur/pointeuse.js
+VERSION_DONNEES_BILAN = 2   # 2 : + suivi des projets (ADR 004) ; = DONNEES_LOCALES_VERSION dans lecteur/pointeuse.js
 NOM_FICHIER_AUTOSTART = "pointeuse.desktop"   # Linux : ~/.config/autostart/
 NOM_FICHIER_VERROU = "pointeuse.lock"   # empêche de lancer deux fois l'appli sur les mêmes fichiers
 # Linux : le thème Qt « gtk3 » (choisi par défaut sous GNOME) fait planter l'appli sur Ubuntu 24.04

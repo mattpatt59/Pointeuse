@@ -8,9 +8,11 @@ from pathlib import Path
 import pytest
 
 from pointeuse import settings
-from pointeuse.suivi import (JournalSuivi, NoteSuivi, est_masque, est_periode_semaine, etats_actuels,
-                             jours_de_periode, libelle_statut, lire_contenu, ligne_json, notes_retenues,
-                             nouvelle_note, periode_de, statut_affiche)
+from pointeuse.journal import Ligne
+from pointeuse.suivi import (JournalSuivi, NoteSuivi, dernier_pointage, est_masque, est_periode_semaine,
+                             etats_actuels, extrait, historique, jours_de_periode, libelle_statut, lire_contenu,
+                             ligne_json, minutes_par_jour, note_de_periode, note_precedente, notes_retenues,
+                             nouvelle_note, periode_de, projets_suivis, statut_affiche)
 
 EXEMPLE = Path(__file__).parent / "donnees" / "suivi_exemple.jsonl"   # jeu commun Python / JS
 
@@ -244,3 +246,81 @@ def test_masquage_et_libelles():
     assert libelle_statut(settings.STATUT_TERMINE_A_CONFIRMER) == "terminé ?"
     assert libelle_statut("attente_client") == "en attente client"
     assert libelle_statut(None) == ""
+
+
+# ─── Fenêtre Suivi : note de la période, message précédent ───────────────────
+
+def test_note_de_periode_et_precedente():
+    notes = [note("2026-11-12 18:00", "2026-11-12", texte="12/11"),
+             note("2026-11-13 09:00", "2026-11-13", texte="13/11 9 h"),
+             note("2026-11-13 17:00", "2026-11-13", texte="13/11 17 h"),
+             note("2026-11-14 10:00", texte="14/11"),
+             note("2026-11-13 12:00", "2026-11-13", texte="autre projet", projet="Autre")]
+    assert note_de_periode(notes, "Alpha Industrie", "Armoire ligne 2", "2026-11-13").texte == "13/11 17 h"
+    assert note_de_periode(notes, "Alpha Industrie", "Armoire ligne 2", "2026-11-15") is None
+    assert note_precedente(notes, "Alpha Industrie", "Armoire ligne 2", "2026-11-14").texte == "13/11 17 h"
+    assert note_precedente(notes, "Alpha Industrie", "Armoire ligne 2", "2026-11-12") is None
+    # Une note de semaine écrite après coup : la précédente de la semaine 47 est la dernière de la 46.
+    assert note_precedente(notes, "Alpha Industrie", "Armoire ligne 2", "2026-W47").texte == "14/11"
+    # Autre poste : pas pris pour « Message du … » de ce poste.
+    assert note_precedente(notes, "Alpha Industrie", "Armoire ligne 2", "2026-11-14", poste="bureau") is None
+
+
+# ─── Temps pointé ────────────────────────────────────────────────────────────
+
+def ligne(debut: str, fin: str, projet: str = "Armoire ligne 2") -> Ligne:
+    return Ligne(a(debut), a(fin), "Alpha Industrie", projet, "cdc", "")
+
+
+def test_minutes_par_jour_coupe_a_minuit():
+    lignes = [ligne("2026-11-13 09:00", "2026-11-13 10:30"), ligne("2026-11-13 14:00", "2026-11-13 14:15"),
+              ligne("2026-11-13 23:00", "2026-11-14 01:00"), ligne("2026-11-13 08:00", "2026-11-13 18:00", "Autre")]
+    assert minutes_par_jour(lignes, "Alpha Industrie", "Armoire ligne 2") == {
+        date(2026, 11, 13): 90 + 15 + 60, date(2026, 11, 14): 60}
+    assert dernier_pointage(lignes, "Alpha Industrie", "Armoire ligne 2") == a("2026-11-14 01:00")
+    assert dernier_pointage(lignes, "Alpha Industrie", "Inconnu") is None
+
+
+# ─── Liste des projets ───────────────────────────────────────────────────────
+
+def test_projets_suivis_tri_masquage_et_projets_hors_config():
+    config = [("Alpha Industrie", "Armoire ligne 2", True), ("Alpha Industrie", "Rétrofit presse", False),
+              ("Bêta Automatismes", "Carte capteur v2", True), ("Bêta Automatismes", "Firmware passerelle", True)]
+    notes = [note("2026-11-14 10:00", priorite=-5),
+             NoteSuivi(a("2026-11-14 11:00"), "2026-11-14", "Bêta Automatismes", "Firmware passerelle",
+                       "termine", 3, ""),
+             NoteSuivi(a("2026-11-14 12:00"), "2026-11-14", "Bêta Automatismes", "Carte capteur v2",
+                       "termine", 2, ""),
+             NoteSuivi(a("2026-11-14 12:00"), "2026-11-14", "Delta", "Hors config", "a_faire", 1, "")]
+    lignes = [Ligne(a("2026-11-17 09:00"), a("2026-11-17 10:00"), "Bêta Automatismes", "Carte capteur v2", "", "")]
+    projets = projets_suivis(config, notes, lignes)
+    assert [(p.projet, p.priorite, p.statut, p.masque) for p in projets] == [
+        ("Armoire ligne 2", -5, "en_cours", False),
+        ("Rétrofit presse", 0, None, True),                          # masqué dans la config
+        ("Hors config", 1, "a_faire", False),                        # n'existe que dans les notes
+        ("Carte capteur v2", 2, settings.STATUT_TERMINE_A_CONFIRMER, False),   # pointé après « terminé »
+        ("Firmware passerelle", 3, "termine", True),
+    ]
+
+
+# ─── Historique ──────────────────────────────────────────────────────────────
+
+def test_historique_jours_et_semaine_en_tete():
+    notes = [note("2026-11-13 17:00", "2026-W46", texte="bilan semaine"),
+             note("2026-11-12 18:00", "2026-11-12", texte="12/11"),
+             note("2026-11-17 18:00", "2026-11-17", texte="autre", projet="Autre")]
+    minutes = {date(2026, 11, 12): 60, date(2026, 11, 13): 30, date(2026, 11, 17): 45, date(2026, 11, 16): 0}
+    entrees = historique(notes, minutes, "Alpha Industrie", "Armoire ligne 2")
+    assert [(e.periode, e.minutes, [n.texte for n in e.notes]) for e in entrees] == [
+        ("2026-11-17", 45, []),
+        ("2026-W46", 90, ["bilan semaine"]),                         # somme des jours, avant ses jours
+        ("2026-11-13", 30, []),
+        ("2026-11-12", 60, ["12/11"]),
+    ]
+    assert entrees[1].est_semaine
+
+
+def test_extrait():
+    assert extrait("Ligne 1\n\n  Ligne 2  ") == "Ligne 1 / Ligne 2"
+    assert extrait("abcdefghij", longueur=5) == "abcd…"
+    assert extrait("") == ""

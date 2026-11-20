@@ -27,9 +27,9 @@
         <h1>Pointeuse</h1>
     </div>
     <div class="barre__actions">
-        <label class="btn btn--sec" title="Fichier pointeuse.csv (plusieurs fichiers possibles)">
+        <label class="btn btn--sec" title="Fichier pointeuse.csv (plusieurs fichiers possibles), et pointeuse_suivi.jsonl pour le suivi des projets">
             Lire un CSV
-            <input type="file" accept=".csv,text/csv" id="fichier" multiple hidden>
+            <input type="file" accept=".csv,text/csv,.jsonl" id="fichier" multiple hidden>
         </label>
         <button type="button" class="btn btn--primary" id="btn-exporter" title="CSV de la répartition (niveau de détail choisi)">Exporter</button>
     </div>
@@ -58,6 +58,7 @@
 <!-- Ligne suivante remplacée par la Pointeuse (menu « Bilan ») par <script src="pointeuse_donnees_tmp.js"> -->
 <!-- POINTEUSE:DONNEES -->
 <script src="fusion.js"></script>
+<script src="suivi.js"></script>
 <script src="pointeuse.js"></script>
 </body>
 </html>

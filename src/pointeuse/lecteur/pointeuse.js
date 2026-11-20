@@ -71,6 +71,7 @@ let couleurs = new Map();  // client → couleur ; absent = « Autres »
 const masques = new Set(); // clients décochés
 let recherche = '';
 let resultat = null;     // dernier calcul (pour l'export et l'info-bulle)
+let suivis = [];         // pointeuse_suivi.jsonl lus : { nom, notes, avertissements } (suivi.js, ADR 004)
 
 const reglages = {
     periode:      'mois',
@@ -79,6 +80,9 @@ const reglages = {
     regroupement: 'auto', // auto | jour | semaine | mois
     detail:       'projet', // client | projet | tache
     pauses:       false,  // pauses visibles dans la liste des lignes
+    vue:          'temps', // temps | suivi (page « Suivi » : statut et notes par projet)
+    historique:   'periode', // suivi : notes de la période du bilan | depuis le …
+    depuis:       null,   // 'AAAA-MM-JJ' si historique = 'depuis'
 };
 
 const $ = sel => document.querySelector(sel);
@@ -284,7 +288,7 @@ function analyserCsv(texte) {
  * ajouter = false : ils remplacent les données ; true : ils s'ajoutent (« Ajouter un autre PC »).
  * Plusieurs fichiers : fusion, le PC principal l'emporte (fusion.js, CDC fusion.md).
  */
-function chargerTextes(entrees, ajouter) {
+function chargerTextes(entrees, ajouter, entreesSuivi) {
     const lus = [];
     for (const { nom, texte } of entrees) {
         let res;
@@ -304,13 +308,17 @@ function chargerTextes(entrees, ajouter) {
         }
         lus.push({ nom, lignes: lignes.length, erreurs: res.erreurs, pointages: lignes });
     }
-    if (lus.length === 0) return;
+    // Notes de suivi : le nom du fichier sert de nom de poste (plusieurs postes : notes côte à côte).
+    const suivisLus = (entreesSuivi || []).map(({ nom, texte }) => Object.assign({ nom }, suiviLire(texte, nom)));
+    if (lus.length === 0 && suivisLus.length === 0) return;
 
     if (ajouter) {
         fichiers = fichiers.concat(lus);
+        suivis = suivis.concat(suivisLus);
     } else {
         fichiers = lus;
         principal = 0;   // ouvert depuis la Pointeuse : son CSV est chargé en premier
+        suivis = suivisLus;
     }
     fusionnerFichiersCharges();
     masques.clear();
@@ -343,14 +351,33 @@ function fusionnerFichiersCharges() {
 }
 
 function lireFichiers(liste, ajouter) {
-    const csv = Array.from(liste).filter(f => /\.(csv|txt)$/i.test(f.name) || f.type === 'text/csv');
-    if (csv.length === 0) {
-        toast('Choisissez un fichier .csv (pointeuse.csv).', true);
+    const tous = Array.from(liste);
+    const jsonl = tous.filter(f => /\.jsonl$/i.test(f.name));
+    const csv = tous.filter(f => !jsonl.includes(f) && (/\.(csv|txt)$/i.test(f.name) || f.type === 'text/csv'));
+    if (csv.length === 0 && jsonl.length === 0) {
+        toast('Choisissez un fichier .csv (pointeuse.csv), et si besoin pointeuse_suivi.jsonl.', true);
         return;
     }
-    Promise.all(csv.map(f => f.text().then(texte => ({ nom: f.name, texte }))))
-        .then(entrees => chargerTextes(entrees, ajouter))
+    const lire = f => f.text().then(texte => ({ nom: f.name, texte }));
+    Promise.all([Promise.all(csv.map(lire)), Promise.all(jsonl.map(lire))])
+        .then(([entrees, entreesSuivi]) => chargerTextes(entrees, ajouter, entreesSuivi))
         .catch(() => toast('Lecture du fichier impossible.', true));
+}
+
+/** Toutes les notes de suivi lues (tous postes). */
+function notesSuivi() {
+    return suivis.flatMap(f => f.notes);
+}
+
+function avecDonnees() {
+    return pointages.length > 0 || suivis.length > 0;
+}
+
+/** Vue affichée : « suivi » seulement s'il y a des notes à montrer, toujours s'il n'y a qu'elles. */
+function vueEffective() {
+    if (suivis.length === 0) return 'temps';
+    if (pointages.length === 0) return 'suivi';
+    return reglages.vue;
 }
 
 function attribuerCouleurs() {
@@ -380,17 +407,28 @@ function serieClient(client) {
 /* ═══════════════════════════════════════
    PÉRIODE ET REGROUPEMENT
 ═══════════════════════════════════════ */
+/** « Tout le fichier » : du premier au dernier jour qui a un pointage ou une note de suivi
+ *  (une note écrite après le dernier pointage doit rester dans la plage, sinon son statut et sa priorité sont perdus). */
 function bornesFichier() {
-    if (pointages.length === 0) {
+    let du = null;
+    let au = null;
+    const etendre = (debut, fin) => {
+        if (du === null || debut < du) du = debut;
+        if (au === null || fin > au) au = fin;
+    };
+    for (const p of pointages) {
+        // Une ligne qui finit pile à minuit n'a rien sur le jour suivant.
+        etendre(jourDe(p.debut), jourDe(new Date(p.fin.getTime() - 1)));
+    }
+    for (const n of notesSuivi()) {
+        const jours = suiviJoursDePeriode(n.periode);
+        etendre(jours.debut, jourDe(n.horodatage));
+    }
+    if (du === null) {
         const auj = jourDe(new Date());
         return { du: auj, au: auj };
     }
-    let fin = pointages[0].fin;
-    for (const p of pointages) {
-        if (p.fin > fin) fin = p.fin;
-    }
-    // Une ligne qui finit pile à minuit n'a rien sur le jour suivant.
-    return { du: jourDe(pointages[0].debut), au: jourDe(new Date(fin.getTime() - 1)) };
+    return { du, au };
 }
 
 /** { du, au } : jours inclus. */
@@ -752,12 +790,15 @@ function htmlRepartition(r) {
         return '<tr><td class="vide" colspan="4">Aucun temps travaillé sur cette période (ou tout est filtré).</td></tr>';
     }
     const rangs = [];
+    const suiviParProjet = suiviDesProjets(r);
     for (const [client, noeud] of trierParTemps(r.arbre, n => n.minutes)) {
         const libelle = `<span class="nom-client"><span class="pastille" style="background:${couleurClient(client)}"></span>${nomOuVide(client, 'sans client')}</span>`;
         rangs.push(ligneRepartition('niv-client', libelle, noeud.minutes, r.travail));
         if (reglages.detail === 'client') continue;
         for (const [projet, np] of trierParTemps(noeud.projets, n => n.minutes)) {
-            rangs.push(ligneRepartition('niv-projet', nomOuVide(projet, 'sans projet'), np.minutes, r.travail));
+            let libelleProjet = nomOuVide(projet, 'sans projet');
+            if (suiviParProjet) libelleProjet += htmlSuiviCourt(suiviParProjet.get(suiviCleProjet(client, projet)));
+            rangs.push(ligneRepartition('niv-projet', libelleProjet, np.minutes, r.travail));
             if (reglages.detail !== 'tache') continue;
             for (const [tache, minutes] of trierParTemps(np.taches, n => n)) {
                 rangs.push(ligneRepartition('niv-tache', nomOuVide(tache, 'sans tâche'), minutes, r.travail));
@@ -817,7 +858,7 @@ function renderVide() {
         </div>
         <div class="bilan-vide__actions">
             <label class="btn btn--primary">Lire mon pointeuse.csv
-                <input type="file" accept=".csv,text/csv" multiple hidden data-fichier></label>
+                <input type="file" accept=".csv,text/csv,.jsonl" multiple hidden data-fichier></label>
             <button type="button" class="btn btn--sec" data-action="exemple">Voir un exemple</button>
         </div>
         <p class="bilan-vide__note">Le fichier se trouve à côté du programme Pointeuse (menu de l'icône → « Ouvrir le CSV »).
@@ -827,8 +868,12 @@ function renderVide() {
 }
 
 function renderBilan(r) {
-    if (pointages.length === 0) {
+    if (!avecDonnees()) {
         renderVide();
+        return;
+    }
+    if (vueEffective() === 'suivi') {
+        renderSuivi(r);
         return;
     }
     let moyenne = 0;
@@ -839,6 +884,7 @@ function renderBilan(r) {
     if (masques.size > 0 || recherche.trim()) filtreActif = ' · filtres actifs';
 
     $('#bilan').innerHTML = `
+        ${htmlOngletsVue()}
         ${htmlFusion()}
         <div class="bilan-entete">
             <h2>${titrePeriode(r)}</h2>
@@ -870,6 +916,145 @@ function renderBilan(r) {
             </table></div>
         </div>`;
     renderGraphe(r);
+}
+
+/* ═══════════════════════════════════════
+   RENDU — SUIVI DES PROJETS (CDC suivi_projets.md, étape 6)
+   Un bloc par projet (statut actuel puis historique jour par jour), une page par projet à l'impression.
+═══════════════════════════════════════ */
+/** Plage de l'historique : la période du bilan, ou « depuis le … » jusqu'à la fin de la période. */
+function plageSuivi(r) {
+    let du = r.du;
+    const depuis = depuisCle(reglages.depuis);
+    if (reglages.historique === 'depuis' && depuis && depuis <= r.au) du = depuis;
+    return { du, au: r.au };
+}
+
+function calculerSuivi(r) {
+    const { du, au } = plageSuivi(r);
+    const blocs = suiviBilan(notesSuivi(), pointages, du, au, {
+        clientPause: CFG.clientPause,
+        garder: client => !masques.has(client),
+    });
+    return { du, au, blocs };
+}
+
+/** Vue Temps : statut et priorité de chaque projet à la fin de la période (null sans journal de suivi). */
+function suiviDesProjets(r) {
+    if (suivis.length === 0) return null;
+    const blocs = suiviBilan(notesSuivi(), pointages, r.du, r.au, { clientPause: CFG.clientPause });
+    return new Map(blocs.map(b => [suiviCleProjet(b.client, b.projet), b]));
+}
+
+/** « Priorité 10 · terminé » à côté du nom du projet, s'il a une note. */
+function htmlSuiviCourt(bloc) {
+    if (!bloc || !bloc.etat) return '';
+    return ` <span class="suivi-court"><span class="tag">Priorité ${bloc.priorite}</span> ${badgeStatut(bloc.statut)}</span>`;
+}
+
+/** Onglets « Temps | Suivi des projets » en tête du bilan, quand les deux vues ont des données. */
+function htmlOngletsVue() {
+    if (suivis.length === 0 || pointages.length === 0) return '';
+    const vue = vueEffective();
+    const onglet = (valeur, libelle) => {
+        let classe = 'onglet';
+        if (valeur === vue) classe += ' onglet--actif';
+        return `<button type="button" class="${classe}" data-reglage="vue" data-valeur="${valeur}">${libelle}</button>`;
+    };
+    return `<nav class="onglets-vue sans-impression">${onglet('temps', 'Temps')}${onglet('suivi', 'Suivi des projets')}</nav>`;
+}
+
+function texteJourCourt(d) {
+    return deux(d.getDate()) + '/' + deux(d.getMonth() + 1);
+}
+
+function libellePeriodeSuivi(periode) {
+    const { debut, fin } = suiviJoursDePeriode(periode);
+    if (suiviEstSemaine(periode)) {
+        return 'semaine ' + Number(periode.slice(-2)) + ' (' + texteJourCourt(debut) + ' → ' + texteJourCourt(fin) + ')';
+    }
+    return texteJour(debut);
+}
+
+function badgeStatut(statut) {
+    if (!statut) return '<span class="statut statut--aucun">sans note</span>';
+    return `<span class="statut statut--${statut}">${esc(suiviLibelleStatut(statut))}</span>`;
+}
+
+function texteNote(texte) {
+    if (!texte.trim()) return '<span class="sans-nom">(pas de texte)</span>';
+    return esc(texte);
+}
+
+/** Notes d'une période : une seule en général, une par poste si deux postes ont écrit. */
+function htmlNotes(notes) {
+    const plusieursPostes = suivis.length > 1;
+    return notes.map(n => {
+        let poste = '';
+        if (plusieursPostes) poste = `<b class="note__poste">${esc(n.poste)}</b> `;
+        return `<div class="note">${poste}${badgeStatut(n.statut)} <span class="note__texte">${texteNote(n.texte)}</span></div>`;
+    }).join('');
+}
+
+function htmlLignesSuivi(bloc) {
+    return bloc.lignes.map(l => {
+        let temps = '—';
+        if (l.minutes > 0) temps = hmin(l.minutes);
+        if (l.type === 'semaine') {
+            const ecrite = l.notes[l.notes.length - 1].horodatage;
+            return `<tr class="suivi-semaine"><td colspan="3">
+                <div class="suivi-semaine__titre">${esc(libellePeriodeSuivi(l.periode))} — note du ${texteJourCourt(ecrite)}
+                    <span class="suivi-semaine__temps">${temps}</span></div>
+                ${htmlNotes(l.notes)}</td></tr>`;
+        }
+        return `<tr><td>${texteJour(l.jour)}</td><td class="nb">${temps}</td><td class="texte">${htmlNotes(l.notes)}</td></tr>`;
+    }).join('');
+}
+
+function htmlBlocSuivi(bloc) {
+    let etat = '<p class="suivi-etat sans-nom">Aucune note pour ce projet.</p>';
+    if (bloc.etat) {
+        etat = `<p class="suivi-etat"><b>Statut en cours (${esc(libellePeriodeSuivi(bloc.etat.periode))}) :</b>
+            ${badgeStatut(bloc.statut)} <span class="note__texte">${texteNote(bloc.etat.texte)}</span></p>`;
+    }
+    let lignes = '<p class="cfg-note">Ni temps ni note sur la plage.</p>';
+    if (bloc.lignes.length > 0) {
+        lignes = `<div class="table-defile"><table class="table suivi-table">
+            <thead><tr><th>Date</th><th class="nb">Temps</th><th>Note</th></tr></thead>
+            <tbody>${htmlLignesSuivi(bloc)}</tbody></table></div>`;
+    }
+    return `<section class="carte suivi-projet">
+        <div class="carte__entete">
+            <h3><span class="nom-client"><span class="pastille" style="background:${couleurClient(bloc.client)}"></span>${nomOuVide(bloc.client, 'sans client')}</span>
+                — ${nomOuVide(bloc.projet, 'sans projet')}</h3>
+            <span class="suivi-projet__infos"><span class="tag">Priorité ${bloc.priorite}</span> ${badgeStatut(bloc.statut)}
+                <span class="carte__note">${hmin(bloc.minutes)} sur la plage</span></span>
+        </div>
+        ${etat}
+        ${lignes}
+    </section>`;
+}
+
+function renderSuivi(r) {
+    const s = calculerSuivi(r);
+    let titre = 'Suivi des projets du ' + texteJour(s.du) + ' au ' + texteJour(s.au);
+    if (s.du.getTime() === s.au.getTime()) titre = 'Suivi des projets du ' + texteJour(s.du);
+    let filtreActif = '';
+    if (masques.size > 0) filtreActif = ' · filtres actifs';
+    let corps = s.blocs.map(htmlBlocSuivi).join('');
+    if (s.blocs.length === 0) {
+        corps = '<div class="carte"><p class="cfg-note">Aucun projet avec du temps ou une note sur cette plage.</p></div>';
+    }
+    $('#bilan').innerHTML = `
+        ${htmlOngletsVue()}
+        ${htmlFusion()}
+        <div class="bilan-entete">
+            <h2>${titre}</h2>
+            <span class="bilan-entete__info">${s.blocs.length} projet(s)${filtreActif}
+                <button type="button" class="btn btn--sec sans-impression" data-action="imprimer"
+                    title="Une page par projet">Imprimer</button></span>
+        </div>
+        ${corps}`;
 }
 
 /* ═══════════════════════════════════════
@@ -944,13 +1129,7 @@ function htmlFichiers() {
     const plusieurs = fichiers.length > 1;
     const retirees = minutesRetirees();
     return fichiers.map((f, i) => {
-        let erreurs = '';
-        if (f.erreurs.length > 0) {
-            const visibles = f.erreurs.slice(0, CFG.erreursAffichees).map(e => `<li>${esc(e)}</li>`).join('');
-            let suite = '';
-            if (f.erreurs.length > CFG.erreursAffichees) suite = `<li>… et ${f.erreurs.length - CFG.erreursAffichees} autre(s)</li>`;
-            erreurs = `<ul class="fichier__erreurs">${visibles}${suite}</ul>`;
-        }
+        const erreurs = listeErreurs(f.erreurs);
         let fusionTexte = '';
         if (retirees[i] > 0) fusionTexte += ` · <span class="fichier__retire">${hmin(retirees[i])} retirées</span>`;
         if (fusion && fusion.doublons[i] > 0) fusionTexte += ` · ${fusion.doublons[i]} ligne(s) déjà dans le principal`;
@@ -961,7 +1140,18 @@ function htmlFichiers() {
             choix = `<label class="fichier__principal"><input type="radio" name="principal" value="${i}"${coche}> PC principal</label>`;
         }
         return `<div class="fichier"><b>${esc(f.nom)}</b> — ${f.lignes} ligne(s)${fusionTexte}${choix}${erreurs}</div>`;
+    }).join('') + suivis.map(f => {
+        // Lignes abîmées : mêmes messages que la Pointeuse (fenêtre « Suivi »).
+        return `<div class="fichier"><b>${esc(f.nom)}</b> — ${f.notes.length} note(s) de suivi${listeErreurs(f.avertissements)}</div>`;
     }).join('');
+}
+
+function listeErreurs(erreurs) {
+    if (erreurs.length === 0) return '';
+    const visibles = erreurs.slice(0, CFG.erreursAffichees).map(e => `<li>${esc(e)}</li>`).join('');
+    let suite = '';
+    if (erreurs.length > CFG.erreursAffichees) suite = `<li>… et ${erreurs.length - CFG.erreursAffichees} autre(s)</li>`;
+    return `<ul class="fichier__erreurs">${visibles}${suite}</ul>`;
 }
 
 function htmlActionsFichiers() {
@@ -972,8 +1162,8 @@ function htmlActionsFichiers() {
                 remplacer <code>pointeuse.csv</code> par <code>${CFG.nomFusion}</code>, relancer.</p>`;
     }
     return `<div class="fichiers__actions">
-            <label class="btn-lien" title="pointeuse.csv d'un autre poste : fusionné avec le PC principal">＋ Ajouter un autre PC
-                <input type="file" accept=".csv,text/csv" multiple hidden data-ajout></label>
+            <label class="btn-lien" title="pointeuse.csv (et pointeuse_suivi.jsonl) d'un autre poste : fusionné avec le PC principal">＋ Ajouter un autre PC
+                <input type="file" accept=".csv,text/csv,.jsonl" multiple hidden data-ajout></label>
             ${fusionner}
         </div>`;
 }
@@ -985,10 +1175,11 @@ function noteFichiers() {
 
 function renderConfig(r) {
     const config = $('#config');
-    if (pointages.length === 0) {
+    if (!avecDonnees()) {
         config.innerHTML = `<section class="cfg-section"><h2>Mode d'emploi</h2>
             <p class="cfg-note">1. Dans la Pointeuse : menu de l'icône → « Ouvrir le CSV » pour retrouver le fichier.</p>
-            <p class="cfg-note">2. Ici : « Lire un CSV », ou glissez le fichier sur la page.</p>
+            <p class="cfg-note">2. Ici : « Lire un CSV », ou glissez le fichier sur la page.
+                Ajoutez <code>pointeuse_suivi.jsonl</code> pour la page « Suivi » des projets.</p>
             <p class="cfg-note">Le fichier est lu par votre navigateur : il n'est ni envoyé, ni conservé.</p></section>`;
         return;
     }
@@ -999,6 +1190,39 @@ function renderConfig(r) {
     }).join('');
     let pausesCochees = '';
     if (reglages.pauses) pausesCochees = ' checked';
+    const suivi = vueEffective() === 'suivi';
+
+    let sectionsVue = '';
+    if (suivi) {
+        let depuis = '';
+        if (reglages.historique === 'depuis') {
+            let valeur = cleJour(r.du);
+            if (depuisCle(reglages.depuis)) valeur = reglages.depuis;
+            depuis = `<label class="champ" style="margin-top:8px"><span class="champ__label">Depuis le</span>
+                <input type="date" id="depuis" value="${valeur}" max="${cleJour(r.au)}"></label>`;
+        }
+        sectionsVue = `<section class="cfg-section"><h2>Historique</h2>
+            ${segmente('historique', [['periode', 'Période du bilan'], ['depuis', 'Depuis le…']], reglages.historique)}
+            ${depuis}
+            <p class="cfg-note" style="margin-top:8px">Projets avec du temps ou une note sur la plage, par priorité
+                (la plus urgente d'abord). Statut : dernière note écrite avant la fin de la période.</p>
+        </section>`;
+    } else {
+        sectionsVue = `<section class="cfg-section"><h2>Graphe par</h2>
+            ${segmente('regroupement', [['auto', 'Auto'], ['jour', 'Jour'], ['semaine', 'Semaine'], ['mois', 'Mois']], reglages.regroupement)}
+        </section>
+        <section class="cfg-section"><h2>Répartition</h2>
+            ${segmente('detail', [['client', 'Client'], ['projet', 'Projet'], ['tache', 'Tâche']], reglages.detail)}
+        </section>`;
+    }
+    let recherchePauses = '';
+    if (!suivi) {
+        recherchePauses = `<label class="champ"><input type="search" id="recherche" placeholder="Rechercher (projet, tâche, description…)" value="${esc(recherche)}"></label>`;
+    }
+    let casePauses = '';
+    if (!suivi) {
+        casePauses = `<label class="case" style="margin-top:10px"><input type="checkbox" id="pauses"${pausesCochees}> Afficher les pauses dans les lignes</label>`;
+    }
 
     config.innerHTML = `
         <section class="cfg-section"><h2>Période</h2>
@@ -1012,17 +1236,12 @@ function renderConfig(r) {
                 <label class="champ"><span class="champ__label">Au</span><input type="date" id="au" value="${cleJour(r.au)}"></label>
             </div>
         </section>
-        <section class="cfg-section"><h2>Graphe par</h2>
-            ${segmente('regroupement', [['auto', 'Auto'], ['jour', 'Jour'], ['semaine', 'Semaine'], ['mois', 'Mois']], reglages.regroupement)}
-        </section>
-        <section class="cfg-section"><h2>Répartition</h2>
-            ${segmente('detail', [['client', 'Client'], ['projet', 'Projet'], ['tache', 'Tâche']], reglages.detail)}
-        </section>
+        ${sectionsVue}
         <section class="cfg-section"><h2>Filtres</h2>
-            <label class="champ"><input type="search" id="recherche" placeholder="Rechercher (projet, tâche, description…)" value="${esc(recherche)}"></label>
+            ${recherchePauses}
             <h2 style="margin-top:4px">Clients <span><button type="button" class="btn-lien" data-action="tous">Tous</button> · <button type="button" class="btn-lien" data-action="aucun">Aucun</button></span></h2>
             ${htmlClients(r)}
-            <label class="case" style="margin-top:10px"><input type="checkbox" id="pauses"${pausesCochees}> Afficher les pauses dans les lignes</label>
+            ${casePauses}
         </section>
         <section class="cfg-section"><h2>Fichiers lus <button type="button" class="btn-lien" data-action="fermer">Fermer</button></h2>
             ${htmlFichiers()}
@@ -1035,7 +1254,7 @@ function toutAfficher() {
     resultat = calculer();
     renderBilan(resultat);
     renderConfig(resultat);
-    $('#btn-exporter').disabled = pointages.length === 0;
+    $('#btn-exporter').disabled = pointages.length === 0 || vueEffective() === 'suivi';
     sauverReglages();
 }
 
@@ -1192,6 +1411,9 @@ function chargerReglages() {
         reglages.pauses = brut.pauses === true;
         if (depuisCle(brut.du)) reglages.du = brut.du;
         if (depuisCle(brut.au)) reglages.au = brut.au;
+        if (['temps', 'suivi'].includes(brut.vue)) reglages.vue = brut.vue;
+        if (['periode', 'depuis'].includes(brut.historique)) reglages.historique = brut.historique;
+        if (depuisCle(brut.depuis)) reglages.depuis = brut.depuis;
     } catch (e) {
         /* réglages illisibles : valeurs par défaut */
     }
@@ -1206,6 +1428,7 @@ function surAction(action) {
         return;
     }
     if (action === 'rapport') exporterRapport();
+    if (action === 'imprimer') window.print();
     if (action === 'csv-fusion') exporterFusion();
     if (action === 'precedent') decaler(-1);
     if (action === 'suivant') decaler(1);
@@ -1222,6 +1445,7 @@ function surAction(action) {
         fichiers = [];
         principal = 0;
         fusion = null;
+        suivis = [];
         masques.clear();
         recherche = '';
         toutAfficher();
@@ -1279,6 +1503,10 @@ function brancher() {
             if (cible.checked) masques.delete(cible.dataset.client);
             else masques.add(cible.dataset.client);
             toutAfficher();
+        } else if (cible.id === 'depuis') {
+            if (!depuisCle(cible.value)) return;
+            reglages.depuis = cible.value;
+            toutAfficher();
         } else if (cible.id === 'pauses') {
             reglages.pauses = cible.checked;
             toutAfficher();
@@ -1333,11 +1561,17 @@ brancher();
 toutAfficher();
 
 /* Ouverture depuis la Pointeuse (menu « Bilan ») : la page locale charge d'abord
-   pointeuse_donnees_tmp.js, qui définit window.POINTEUSE_CSV = { version, nom, texte }. */
-const DONNEES_LOCALES_VERSION = 1;
+   pointeuse_donnees_tmp.js, qui définit window.POINTEUSE_CSV = { version, nom, texte, suivi }
+   (suivi : { nom, texte } du pointeuse_suivi.jsonl, ou null). */
+const DONNEES_LOCALES_VERSION = 2;
 const donneesLocales = window.POINTEUSE_CSV;
 if (donneesLocales && donneesLocales.version === DONNEES_LOCALES_VERSION && typeof donneesLocales.texte === 'string') {
-    chargerTextes([{ nom: String(donneesLocales.nom || 'pointeuse.csv'), texte: donneesLocales.texte }], false);
+    const entreesSuivi = [];
+    const suiviLocal = donneesLocales.suivi;
+    if (suiviLocal && typeof suiviLocal.texte === 'string') {
+        entreesSuivi.push({ nom: String(suiviLocal.nom || 'pointeuse_suivi.jsonl'), texte: suiviLocal.texte });
+    }
+    chargerTextes([{ nom: String(donneesLocales.nom || 'pointeuse.csv'), texte: donneesLocales.texte }], false, entreesSuivi);
 } else if (donneesLocales) {
     toast('Données de la Pointeuse dans un format inconnu : lisez le CSV avec « Lire un CSV ».', true);
 }

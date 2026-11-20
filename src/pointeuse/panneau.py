@@ -20,6 +20,7 @@ class OngletPointer(QWidget):
     """Onglet 1 : démarrer / modifier une tâche, pause / reprendre, stop, repas, boutons rapides."""
 
     etat_change = Signal()
+    suivi_demande = Signal(str, str)   # client, projet du formulaire : ouvrir la fenêtre « Suivi »
 
     def __init__(self, moteur: Moteur, horloge=datetime.now, parent=None):
         super().__init__(parent)
@@ -73,6 +74,13 @@ class OngletPointer(QWidget):
 
         self.masques = QCheckBox("Afficher les projets masqués")
         self.masques.toggled.connect(self.formulaire.changer_affichage_masques)
+        self.bouton_suivi = QPushButton("Suivi…")
+        self.bouton_suivi.setToolTip("Statut, priorité et note du projet choisi")
+        self.bouton_suivi.clicked.connect(self._demander_suivi)
+        ligne_bas = QHBoxLayout()
+        ligne_bas.addWidget(self.masques)
+        ligne_bas.addStretch()
+        ligne_bas.addWidget(self.bouton_suivi)
 
         disposition = QVBoxLayout(self)
         disposition.setContentsMargins(16, 16, 16, 16)
@@ -84,11 +92,15 @@ class OngletPointer(QWidget):
         disposition.addLayout(ligne_arret)
         disposition.addWidget(self.titre_raccourcis)
         disposition.addLayout(self.zone_raccourcis)
-        disposition.addWidget(self.masques)
+        disposition.addLayout(ligne_bas)
         disposition.addStretch()
 
         self.preremplir()
         self.rafraichir()
+
+    def _demander_suivi(self) -> None:
+        client, projet, _, _ = self.formulaire.valeurs()
+        self.suivi_demande.emit(client, projet)
 
     # ─── Affichage ───────────────────────────────────────────────────────────
 

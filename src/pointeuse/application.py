@@ -18,11 +18,13 @@ from pointeuse.chemins import DossierNonInscriptible, est_executable, chemin_con
 from pointeuse.config import Config, ConfigInvalide
 from pointeuse.dialogue_absence import DialogueAbsence
 from pointeuse.evenements import JournalEvenements
+from pointeuse.fenetre_suivi import FenetreSuivi
 from pointeuse.icone import icone_etat
 from pointeuse.journal import Journal, a_la_minute
 from pointeuse.moteur import Moteur
 from pointeuse.panneau import Panneau
 from pointeuse.style import feuille_de_style
+from pointeuse.suivi import JournalSuivi
 
 
 class Application:
@@ -36,6 +38,8 @@ class Application:
         self.panneau = Panneau(moteur)
         self.panneau.pointer.etat_change.connect(self.mettre_a_jour)
         self.panneau.journee.etat_change.connect(self.mettre_a_jour)
+        self.suivi = FenetreSuivi(moteur, JournalSuivi(moteur.journal.chemin.parent / settings.NOM_FICHIER_SUIVI))
+        self.panneau.pointer.suivi_demande.connect(self.suivi.ouvrir)
 
         self.icone = QSystemTrayIcon()
         self.icone.activated.connect(self._icone_activee)
@@ -43,6 +47,7 @@ class Application:
         for libelle, action in (("Ouvrir", self.afficher_panneau),
                                 ("Ouvrir le CSV", lambda: self._ouvrir_fichier(moteur.journal.chemin)),
                                 ("Ouvrir la config", lambda: self._ouvrir_fichier(moteur.config.chemin)),
+                                ("Suivi des projets…", lambda: self.suivi.ouvrir()),
                                 ("Bilan", self._ouvrir_bilan),
                                 (None, None),
                                 ("Quitter", self.quitter)):
@@ -243,7 +248,7 @@ class Application:
         La tâche en cours n'y figure pas : elle n'est écrite dans le CSV qu'à sa fin."""
         chemin_csv = self.moteur.journal.chemin
         try:
-            page = preparer_bilan(chemin_csv, chemin_csv.parent)
+            page = preparer_bilan(chemin_csv, chemin_csv.parent, self.suivi.journal_suivi.chemin)
         except CsvAbsent:
             QMessageBox.information(None, settings.NOM_APPLICATION,
                                     f"{chemin_csv.name} n'existe pas encore (il est créé à la première tâche terminée).")

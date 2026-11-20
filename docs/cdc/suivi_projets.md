@@ -2,7 +2,7 @@
 
 **Date demande :** 2026-11-20
 **Date création :** 2026-11-20
-**Statut :** PLAN
+**Statut :** PARTIELLEMENT IMPLÉMENTÉ
 
 ---
 
@@ -189,6 +189,27 @@ Alpha Industrie — Armoire ligne 2           Priorité -10      Statut : BLOQU�
   du nom du poste.
 - Impression : saut de page entre projets.
 
+Réalisé (étape 6) :
+
+- Onglets « Temps | Suivi des projets » en tête du bilan, visibles dès qu'un
+  `pointeuse_suivi.jsonl` est chargé avec des pointages (seule vue possible s'il n'y
+  a que lui). Premier essai : le choix était dans les réglages, à droite — passé
+  inaperçu à l'usage, déplacé en onglets.
+- Vue Temps, tableau Répartition : priorité et statut (fin de période) à côté de
+  chaque projet qui a une note.
+- Période « Tout le fichier » : va du premier au dernier jour qui a un pointage **ou une
+  note de suivi**. Avant, elle s'arrêtait au dernier pointage : une note écrite ensuite
+  sortait de la plage et le projet s'affichait « Priorité 0, sans note » (vu à l'usage).
+- En-tête de chaque projet : priorité et statut **à la fin de la période** (dernière
+  note écrite avant), `terminé ?` si du temps a été pointé ensuite ; puis
+  « Statut en cours (date) » avec le texte de cette note, même si elle est antérieure à
+  la plage.
+- Filtres clients du bilan appliqués ; recherche, pauses, graphe et répartition masqués
+  dans cette vue ; « Exporter » désactivé (l'export reste celui des temps).
+- Lignes abîmées du jsonl : listées sous le fichier dans « Fichiers lus », avec les
+  mêmes messages que la fenêtre Suivi.
+- Plusieurs jsonl chargés : le nom du fichier sert de nom de poste.
+
 ---
 
 ## Questions ouvertes
@@ -205,10 +226,10 @@ Alpha Industrie — Armoire ligne 2           Priorité -10      Statut : BLOQU�
 
 - [x] Step 1 — Valider le format, ADR `docs/adr/004-journal-suivi.md` (ACCEPTÉ 2026-11-20)
 - [x] Step 2 — `suivi.py` : lecture / ajout dans `pointeuse_suivi.jsonl` (+ tests)
-- [ ] Step 3 — Fenêtre « Suivi » (saisie + historique)
+- [x] Step 3 — Fenêtre « Suivi » (saisie + historique) : menu de l'icône « Suivi des projets… » et bouton « Suivi… » de l'onglet Pointer ; section `[suivi]` de la config (`periode_note`, `rappel_au_stop`) (+ tests)
 - [ ] Step 4 — Masquage des projets `terminé` / statut calculé `terminé ?` (Suivi + onglet Pointer)
 - [ ] Step 5 — Rappel au Stop
-- [ ] Step 6 — Bilan : page « Suivi »
+- [x] Step 6 — Bilan : page « Suivi » — vue « Suivi des projets » du lecteur (`lecteur/suivi.js` + `pointeuse.js`), réglage « Historique : période du bilan / depuis le … », bouton « Imprimer » (un projet par page) ; `pointeuse_suivi.jsonl` transmis brut par `bilan.py` (`VERSION_DONNEES_BILAN` = 2) ou lu avec « Lire un CSV » / « Ajouter un autre PC » (+ tests JS sur le jeu d'exemple commun)
 - [ ] Step 7 — Fusion multi-postes du journal de suivi
 
 ---
@@ -226,7 +247,7 @@ Alpha Industrie — Armoire ligne 2           Priorité -10      Statut : BLOQU�
 | `src/pointeuse/formulaire.py` | modifier | listes de l'onglet Pointer : masquer les projets `terminé` |
 | `src/pointeuse/panneau.py`, `icone.py` | modifier | accès à la fenêtre, rappel au Stop |
 | `src/pointeuse/bilan.py` | modifier | injecter le suivi (`VERSION_DONNEES_BILAN` + 1) |
-| `src/pointeuse/lecteur/*` | modifier | page « Suivi » |
+| `src/pointeuse/lecteur/*` | modifier | page « Suivi » : `suivi.js` (lecture + blocs par projet, sans page), `pointeuse.js`, `pointeuse.css`, `index.html` |
 | `docs/adr/004-journal-suivi.md` | créer | format du nouveau fichier |
 
 ---

@@ -37,7 +37,8 @@ dépôt** pour le lecteur (pas de contrat à tenir entre deux dépôts).
   site en adresses absolues, logo dans le dossier.
 - Menu de l'icône « **Bilan** » (`bilan.py`) : copie le lecteur dans
   `<dossier du programme>/bilan/`, convertit le CSV en
-  `pointeuse_donnees_tmp.js` → `window.POINTEUSE_CSV = {version, nom, texte}`
+  `pointeuse_donnees_tmp.js` → `window.POINTEUSE_CSV = {version, nom, texte, suivi}`
+  (`suivi` = `{nom, texte}` du journal de suivi, ou `null` : ajouté en version 2, ADR 004)
   (`json.dumps`, tout est échappé), remplace le marqueur `<!-- POINTEUSE:DONNEES -->` de
   la page par la balise `<script>` correspondante, puis ouvre la page (`file://`).
   Une page locale ne peut pas *lire* un fichier voisin, mais peut *charger un script*

@@ -105,6 +105,10 @@ Contraintes :
   lecture ci-dessus.
 - Changement de structure de `window.POINTEUSE_CSV` → `VERSION_DONNEES_BILAN` passe à `2`
   (Python et JS, vérifié par le test existant).
+- Réalisé (2026-11-20) : champ `suivi: {nom, texte} | null` ; lecture côté page dans
+  `lecteur/suivi.js`, testée sur `tests/donnees/suivi_exemple.jsonl` comme `suivi.py`
+  (`tests/test_bilan_suivi.py`). Un octet non UTF-8 est remplacé par U+FFFD à la
+  transmission, et la page refuse la ligne avec le même message que Python.
 
 ---
 

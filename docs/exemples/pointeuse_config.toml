@@ -17,6 +17,11 @@ absence_longue_h = 4        # absence plus longue (ou nuit) : pas de question au
 retention_journal_jours = 90  # journal des événements : durée de conservation (0 = pas de journal)
 afficher_journal = true     # vue Journée : événements et moments non pointés
 
+# Suivi des projets (menu « Suivi… ») : une note par projet et par période.
+[suivi]
+periode_note = "jour"     # "jour" ou "semaine" : une note par jour ou par semaine
+rappel_au_stop = true     # au Stop, proposer la note du projet arrêté s'il n'en a pas
+
 [clients."Alpha Industrie"]
 "Armoire ligne 2" = { taches = ["cdc", "schéma électrique", "câblage"] }
 "Rétrofit presse" = { taches = ["étude", "mise en service", "doc"], visible = false }   # projet fini

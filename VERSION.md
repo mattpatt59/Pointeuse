@@ -3,11 +3,15 @@
 ## [Non publié]
 
 ### Ajouté
-- Journal de suivi des projets `pointeuse_suivi.jsonl` (statut, priorité, note par jour ou par semaine) : lecture / écriture et règles de lecture (`suivi.py`), sans interface pour l'instant. Nouveau fichier de données, `pointeuse.csv` inchangé (CDC suivi_projets.md étapes 1-2, ADR 004)
+- Journal de suivi des projets `pointeuse_suivi.jsonl` (statut, priorité, note par jour ou par semaine) : lecture / écriture et règles de lecture (`suivi.py`), Nouveau fichier de données, `pointeuse.csv` inchangé (CDC suivi_projets.md étapes 1-2, ADR 004)
+- Fenêtre « Suivi des projets » (menu de l'icône, bouton « Suivi… » de l'onglet Pointer) : projets triés par priorité, message précédent, note de la période avec statut et priorité, historique temps + notes ; section `[suivi]` dans `pointeuse_config.toml` (`periode_note` = jour / semaine, `rappel_au_stop`) (CDC suivi_projets.md étape 3)
+- Bilan : vue « Suivi des projets » : par projet (trié par priorité) le statut en cours puis l'historique jour par jour (temps + notes, note de semaine en tête de sa semaine), sur la période du bilan ou « depuis le … », onglets « Temps | Suivi des projets » en tête du bilan, priorité et statut aussi dans la Répartition de la vue Temps ; bouton « Imprimer », un projet par page. Le bilan reçoit `pointeuse_suivi.jsonl` (données du bilan en version 2) ; dans le lecteur seul, le jsonl se lit avec « Lire un CSV » (CDC suivi_projets.md étape 6)
 - Doc utilisateur `docs/user/` : guide général (`pointeuse.md`), onglet Pointer, fusion des CSV de plusieurs PC
 
 ### Modifié
 - GitHub Actions : actions passées en Node.js 24 (`checkout@v7`, `setup-python@v7`, `upload-artifact@v7`, `download-artifact@v8`), Node.js 20 étant déprécié sur les runners
+- Bilan, période « Tout le fichier » : inclut aussi les jours des notes de suivi (une note écrite après le dernier pointage était ignorée : priorité et statut à 0 / sans note)
+- Bilan : les scripts et la feuille de style de la page sont appelés avec un jeton `?v=…` renouvelé à chaque clic sur « Bilan », pour que le navigateur ne ressorte pas d'anciennes données de son cache
 
 ## [0.1.0] - 2026-11-17
 

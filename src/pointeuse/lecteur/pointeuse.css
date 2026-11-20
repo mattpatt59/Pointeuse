@@ -23,6 +23,10 @@
     --red-light:     #fef2f2;
     --orange:        #fb8c00;
     --orange-light:  #fff3e0;
+    --blue:          #1565c0;
+    --blue-light:    #e3f2fd;
+    --success:       #2e7d32;
+    --success-light: #e8f5e9;
 
     --sec:           #546e7a;
     --radius:        8px;
@@ -389,6 +393,72 @@ input:focus, select:focus {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 .toast--erreur { background: #c62828; }
+
+/* ═══════════════════════════════════════
+   SUIVI DES PROJETS (vue « Suivi »)
+═══════════════════════════════════════ */
+.onglets-vue { display: flex; gap: 4px; border-bottom: 2px solid var(--green-dark); margin-bottom: -6px; }
+.onglet {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 8px 18px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background: var(--gray-light);
+    color: var(--gray);
+    cursor: pointer;
+}
+.onglet:hover { background: var(--green-light); color: var(--green-deep); }
+.onglet--actif, .onglet--actif:hover { background: var(--green-dark); border-color: var(--green-dark); color: #fff; }
+.suivi-court { display: inline-flex; gap: 6px; align-items: center; margin-left: 8px; vertical-align: middle; }
+.suivi-court .tag { padding: 1px 6px; }
+.suivi-projet__infos { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.suivi-etat { font-size: 0.875rem; margin-bottom: 10px; padding: 8px 12px; background: var(--green-light);
+    border-left: 4px solid var(--green-dark); border-radius: 4px; }
+.statut {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: baseline;
+    color: var(--gray);
+    background: var(--gray-light);
+    border: 1px solid var(--border);
+}
+.statut--en_cours            { color: var(--green-deep); background: var(--green-light); border-color: rgba(112,173,71,0.35); }
+.statut--bloque              { color: #c62828; background: var(--red-light); border-color: rgba(239,68,68,0.35); }
+.statut--attente_client      { color: #b45f00; background: var(--orange-light); border-color: rgba(251,140,0,0.35); }
+.statut--termine             { color: var(--success); background: var(--success-light); border-color: rgba(46,125,50,0.30); }
+.statut--termine_a_confirmer { color: var(--blue); background: var(--blue-light); border-color: rgba(21,101,192,0.30); }
+.note + .note { margin-top: 4px; }
+.note__texte { white-space: pre-line; }
+.note__poste { font-weight: 600; color: var(--green-deep); }
+.suivi-table { table-layout: fixed; }   /* mêmes colonnes d'un projet à l'autre */
+.suivi-table th:nth-child(1) { width: 120px; }
+.suivi-table th:nth-child(2) { width: 80px; }
+.suivi-table td { vertical-align: top; }
+.table tr.suivi-semaine td { background: #e8f0e0; white-space: normal; }
+.suivi-semaine__titre { font-weight: 600; color: var(--green-deep); display: flex; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.suivi-semaine__temps { font-variant-numeric: tabular-nums; }
+
+/* ═══════════════════════════════════════
+   IMPRESSION (vue « Suivi » : un projet par page)
+═══════════════════════════════════════ */
+@media print {
+    .barre, .espace__config, .pied, .toast, .depot, .sans-impression, .fusion { display: none !important; }
+    body { background: #fff; }
+    .espace { display: block; }
+    .espace__bilan { padding: 0; }
+    .carte { box-shadow: none; break-inside: auto; }
+    .suivi-projet + .suivi-projet { break-before: page; }
+    .table-defile { overflow: visible; }
+    .table tr { break-inside: avoid; }
+    .table tr.suivi-semaine td, .suivi-etat, .statut { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 
 /* ═══════════════════════════════════════
    RESPONSIVE

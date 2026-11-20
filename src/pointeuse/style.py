@@ -27,7 +27,7 @@ def feuille_de_style() -> str:
     chevron_survol = _image_chevron(s.COULEUR_VERT_FONCE)
     return f"""
     QWidget {{ font-family: "{s.POLICE}"; font-size: {s.TAILLE_POLICE_PT}pt; color: {s.COULEUR_NOIR}; }}
-    QWidget#panneau, QDialog {{ background: {s.COULEUR_BLANC}; }}
+    QWidget#panneau, QWidget#fenetre_suivi, QDialog {{ background: {s.COULEUR_BLANC}; }}
 
     QLabel#entete {{
         color: {s.COULEUR_BLANC}; font-weight: bold; font-size: {s.TAILLE_POLICE_PT + 2}pt;
@@ -51,13 +51,14 @@ def feuille_de_style() -> str:
                      padding: 8px 12px; border-radius: 4px; }}
     QLabel[etiquette="true"] {{ color: {s.COULEUR_GRIS}; }}
 
-    QComboBox, QLineEdit, QDateEdit, QTimeEdit {{ border: 1px solid {s.COULEUR_BORDURE}; border-radius: 6px;
+    QComboBox, QLineEdit, QDateEdit, QTimeEdit, QSpinBox, QPlainTextEdit {{ border: 1px solid {s.COULEUR_BORDURE}; border-radius: 6px;
                             padding: 5px 8px; background: {s.COULEUR_BLANC}; min-height: 20px; }}
     QComboBox, QDateEdit {{ padding-right: {s.LARGEUR_FLECHE_LISTE_PX + 4}px; }}
     /* Heures : saisie au clavier ou à la molette, sans les petites flèches.
+       Idem pour la priorité (fenêtre Suivi).
        (setButtonSymbols(NoButtons) réduit le texte à 1 px avec une feuille de style.) */
-    QTimeEdit::up-button, QTimeEdit::down-button {{ width: 0px; border: none; }}
-    QComboBox:focus, QLineEdit:focus, QDateEdit:focus, QTimeEdit:focus {{ border-color: {s.COULEUR_VERT_FONCE}; }}
+    QTimeEdit::up-button, QTimeEdit::down-button, QSpinBox::up-button, QSpinBox::down-button {{ width: 0px; border: none; }}
+    QComboBox:focus, QLineEdit:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus, QPlainTextEdit:focus {{ border-color: {s.COULEUR_VERT_FONCE}; }}
     QComboBox:hover {{ border-color: {s.COULEUR_VERT}; }}
 
     /* Zone de la flèche : bien visible, comme un <select> web */
@@ -106,4 +107,11 @@ def feuille_de_style() -> str:
     QLabel#a_propos {{ color: {s.COULEUR_NOIR}; padding-top: 10px; border-top: 1px solid {s.COULEUR_BORDURE}; }}
     QLabel#totaux {{ font-weight: bold; color: {s.COULEUR_VERT_PROFOND}; }}
     QRadioButton {{ font-weight: bold; color: {s.COULEUR_NOIR}; }}
+
+    /* Fenêtre « Suivi des projets » */
+    QLabel#titre_suivi {{ color: {s.COULEUR_VERT_PROFOND}; font-weight: bold; font-size: {s.TAILLE_POLICE_PT + 3}pt; }}
+    QLabel#titre_section {{ color: {s.COULEUR_VERT_PROFOND}; font-weight: bold; padding-top: 6px;
+                            border-top: 1px solid {s.COULEUR_BORDURE}; }}
+    QLabel#note_precedente {{ background: {s.COULEUR_VERT_CLAIR}; border-left: 4px solid {s.COULEUR_VERT_FONCE};
+                              padding: 8px 12px; border-radius: 4px; }}
     """

@@ -38,6 +38,11 @@ absence_longue_h = 4        # absence plus longue (ou nuit) : pas de question au
 retention_journal_jours = 90  # journal des événements : durée de conservation (0 = pas de journal)
 afficher_journal = true     # vue Journée : événements et moments non pointés
 
+# Suivi des projets (menu « Suivi… ») : une note par projet et par période.
+[suivi]
+periode_note = "jour"     # "jour" ou "semaine" : une note par jour ou par semaine
+rappel_au_stop = true     # au Stop, proposer la note du projet arrêté s'il n'en a pas
+
 [clients."Perso"]
 "administratif" = { taches = [] }
 
@@ -162,6 +167,8 @@ def _verifier_structure(donnees: dict) -> None:
         elif isinstance(valeur, bool) or not isinstance(valeur, int) or valeur <= 0:
             raise ConfigInvalide(f"[reglages] {nom} doit être un nombre entier positif.")
 
+    _verifier_suivi(donnees.get("suivi", {}))
+
     clients = donnees.get("clients", {})
     if not isinstance(clients, dict):
         raise ConfigInvalide('Les clients doivent être déclarés avec [clients."Nom du client"].')
@@ -201,6 +208,21 @@ def _verifier_structure(donnees: dict) -> None:
         raise ConfigInvalide("[taches_communes] liste doit être une liste de textes.")
 
     _verifier_raccourcis(donnees.get("raccourcis", []))
+
+
+def _verifier_suivi(suivi) -> None:
+    """Section [suivi] (CDC suivi_projets.md) : facultative, chaque clé aussi."""
+    if not isinstance(suivi, dict):
+        raise ConfigInvalide("[suivi] doit être une section.")
+    inconnues = [cle for cle in suivi if cle not in settings.SUIVI_DEFAUT]
+    if inconnues:
+        raise ConfigInvalide(f"[suivi] : clé inconnue « {inconnues[0]} » "
+                             f"(autorisées : {', '.join(settings.SUIVI_DEFAUT)}).")
+    if "periode_note" in suivi and suivi["periode_note"] not in settings.PERIODES_NOTE:
+        raise ConfigInvalide(f"[suivi] periode_note doit valoir "
+                             f"{' ou '.join(repr(p) for p in settings.PERIODES_NOTE)}.")
+    if "rappel_au_stop" in suivi and not isinstance(suivi["rappel_au_stop"], bool):
+        raise ConfigInvalide("[suivi] rappel_au_stop doit valoir true ou false.")
 
 
 def _verifier_raccourcis(raccourcis) -> None:
@@ -287,6 +309,13 @@ class Config:
         if nom in reglages:
             return reglages[nom]
         return settings.REGLAGES_DEFAUT[nom]
+
+    def reglage_suivi(self, nom: str) -> str | bool:
+        """Valeur d'un réglage de [suivi], ou sa valeur par défaut."""
+        suivi = self._donnees.get("suivi", {})
+        if nom in suivi:
+            return suivi[nom]
+        return settings.SUIVI_DEFAUT[nom]
 
     def clients(self, inclure_masques: bool = False) -> list[str]:
         """Noms des clients, dans l'ordre du fichier."""
