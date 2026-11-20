@@ -3,6 +3,7 @@
 ## [Non publié]
 
 ### Ajouté
+- Journal de suivi des projets `pointeuse_suivi.jsonl` (statut, priorité, note par jour ou par semaine) : lecture / écriture et règles de lecture (`suivi.py`), sans interface pour l'instant. Nouveau fichier de données, `pointeuse.csv` inchangé (CDC suivi_projets.md étapes 1-2, ADR 004)
 - Doc utilisateur `docs/user/` : guide général (`pointeuse.md`), onglet Pointer, fusion des CSV de plusieurs PC
 
 ### Modifié

@@ -1,0 +1,9 @@
+{"v": 1, "horodatage": "2026-11-14 09:00:00", "periode": "2026-11-14", "client": "Alpha Industrie", "projet": "Armoire ligne 2", "statut": "en_cours", "priorite": 0, "texte": "Version de 9 h"}
+{"v": 1, "horodatage": "2026-11-14 16:00:00", "periode": "2026-11-14", "client": "Alpha Industrie", "projet": "Armoire ligne 2", "statut": "en_cours", "priorite": -10, "texte": "Câblage OK.\nDéfaut sur la sortie 3, à reprendre."}
+{"v": 1, "horodatage": "2026-11-15 17:40:00", "periode": "2026-11-15", "client": "Alpha Industrie", "projet": "Armoire ligne 2", "statut": "bloque", "priorite": -10, "texte": "Attente retour client sur le schéma ; \"urgent\"."}
+pas du JSON
+{"v": 2, "horodatage": "2026-11-15 18:00:00", "periode": "2026-11-15", "client": "Alpha Industrie", "projet": "Armoire ligne 2", "statut": "en_cours", "priorite": 0, "texte": "format futur"}
+{"v": 1, "horodatage": "2026-11-15 18:00:00", "periode": "2026-11-15", "client": "Alpha Industrie", "projet": "Armoire ligne 2", "statut": "fini", "priorite": 0, "texte": "statut inconnu"}
+
+{"v": 1, "horodatage": "2026-11-13 12:00:00", "periode": "2026-W46", "client": "Bêta Automatismes", "projet": "Firmware passerelle", "statut": "termine", "priorite": 150, "texte": "Livré.", "champ_futur": "ignoré"}
+{"v": 1, "horodatage": "2026-11-12 08:00:00", "periode": "2026-11-12", "client": "Bêta Automatismes", "projet": "Carte capteur v2", "statut": "a_faire", "priorite": 5, "texte": ""}

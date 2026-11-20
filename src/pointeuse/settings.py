@@ -20,6 +20,32 @@ COLONNES_EVENEMENTS = ["horodatage", "evenement"]
 FORMAT_HORODATAGE_EVENEMENT = "%Y-%m-%d %H:%M:%S"
 TROU_MIN_AFFICHE_MIN = 5   # vue Journée : un moment actif non pointé plus court n'est pas montré
 
+# ─── Journal de suivi des projets (contrat avec le lecteur de bilan : modifier = ADR 004) ─
+NOM_FICHIER_SUIVI = "pointeuse_suivi.jsonl"
+ENCODAGE_SUIVI = "utf-8"                 # sans BOM : JSON.parse refuse un BOM en tête de ligne
+VERSION_LIGNE_SUIVI = 1                  # champ « v » de chaque ligne
+FORMAT_HORODATAGE_SUIVI = "%Y-%m-%d %H:%M:%S"
+FORMAT_PERIODE_JOUR = "%Y-%m-%d"         # période « jour » : 2026-11-14
+FORMAT_PERIODE_SEMAINE = "{annee}-W{semaine:02d}"   # période « semaine » ISO : 2026-W46
+PERIODE_JOUR = "jour"
+PERIODE_SEMAINE = "semaine"
+PERIODES_NOTE = (PERIODE_JOUR, PERIODE_SEMAINE)
+# Codes écrits dans le fichier → libellés affichés (les libellés peuvent changer, pas les codes).
+STATUTS_SUIVI = {
+    "a_faire": "à faire",
+    "en_cours": "en cours",
+    "bloque": "bloqué",
+    "attente_client": "en attente client",
+    "termine": "terminé",
+}
+STATUT_TERMINE = "termine"
+# Statut calculé, jamais écrit : projet terminé sur lequel du temps a été pointé ensuite.
+STATUT_TERMINE_A_CONFIRMER = "termine_a_confirmer"
+LIBELLE_TERMINE_A_CONFIRMER = "terminé ?"
+PRIORITE_MIN = -99                       # le plus urgent
+PRIORITE_MAX = 99
+PRIORITE_DEFAUT = 0
+
 # ─── Pointage ────────────────────────────────────────────────────────────────
 # Nom de client réservé aux lignes de pause : interdit pour un vrai client.
 CLIENT_PAUSE = "PAUSE"
