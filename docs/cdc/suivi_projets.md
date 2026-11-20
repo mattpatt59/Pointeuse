@@ -2,7 +2,7 @@
 
 **Date demande :** 2026-11-20
 **Date création :** 2026-11-20
-**Statut :** PARTIELLEMENT IMPLÉMENTÉ
+**Statut :** IMPLÉMENTÉ (validé sur poste réel par MP le 2026-11-20, mergé en 1.1.0 ; doc utilisateur `docs/user/suivi_projets.md`)
 
 ---
 
@@ -230,7 +230,7 @@ Réalisé (étape 6) :
 - [x] Step 4 — Masquage des projets `terminé` / statut calculé `terminé ?` (Suivi + onglet Pointer) (+ tests)
 - [x] Step 5 — Rappel au Stop (+ tests)
 - [x] Step 6 — Bilan : page « Suivi » — vue « Suivi des projets » du lecteur (`lecteur/suivi.js` + `pointeuse.js`), réglage « Historique : période du bilan / depuis le … », bouton « Imprimer » (un projet par page) ; `pointeuse_suivi.jsonl` transmis brut par `bilan.py` (`VERSION_DONNEES_BILAN` = 2) ou lu avec « Lire un CSV » / « Ajouter un autre PC » (+ tests JS sur le jeu d'exemple commun)
-- [x] Step 7 — Fusion multi-postes du journal de suivi, dans le bilan (`suiviNomsPostes`, `suiviFusionner` de `lecteur/suivi.js`) (+ tests JS). La collecte automatique des journaux des autres postes viendra avec le CDC `multi_postes.md` (PLAN) ; d'ici là, « Ajouter un autre PC »
+- [x] Step 7 — Fusion multi-postes du journal de suivi, dans le bilan (`suiviNomsPostes`, `suiviFusionner` de `lecteur/suivi.js`) (+ tests JS). La collecte automatique des journaux des autres postes est faite par le CDC `multi_postes.md` (dossier externe) ; « Ajouter un autre PC » reste possible
 
 Réalisé (étape 7, 2026-11-20) :
 

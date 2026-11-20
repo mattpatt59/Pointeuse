@@ -2,7 +2,7 @@
 
 **Date demande :** 2026-11-20
 **Date création :** 2026-11-20
-**Statut :** PARTIELLEMENT IMPLÉMENTÉ (code livré, à valider sur poste réel)
+**Statut :** IMPLÉMENTÉ (validé sur poste réel par MP le 2026-11-20, mergé en 1.1.0)
 
 ---
 
@@ -231,7 +231,7 @@ une note dans `VERSION.md`.
 - [x] Step 3 — Config : section `[donnees]` (`dossier_de_sauvegarde`, `dossier_externe`), lecture et validation
 - [x] Step 4 — Copie après chaque enregistrement : garde-fou de taille, écriture sûre (temporaire + renommage), nouvel essai avec délai doublé (1 min → 1 h max, essai immédiat à chaque enregistrement), notification unique en cas d'échec
 - [x] Step 5 — Bilan : CSV local (« local ») + `<dossier externe>/*/` sauf le dossier de sauvegarde du poste courant, nom du dossier affiché, principal = local
-- [ ] Step 6 — [x] `VERSION.md` (fichiers à déplacer dans `data/`) ; [ ] doc utilisateur `docs/user/multi_postes.md` (réglage `[donnees]`, drive / NAS, sauvegarde sur le même disque, PC client hors réseau, même dossier de sauvegarde sur deux PC, renommage et restauration à la main)
+- [x] Step 6 — `VERSION.md` (fichiers à déplacer dans `data/`) ; doc utilisateur `docs/user/multi_postes.md` (réglage `[donnees]`, drive / NAS, sauvegarde sur le même disque, PC client hors réseau, même dossier de sauvegarde sur deux PC, renommage et restauration à la main)
 
 ---
 
@@ -300,5 +300,5 @@ une note dans `VERSION.md`.
   - **révision MP 2026-11-20** : réglages `dossier_externe` + `poste` remplacés par
     `dossier_de_sauvegarde` (cible, nom = poste) + `dossier_externe` (bilan) ; l'ancienne
     clé `poste` est refusée par la validation de la config.
-- Reste : validation sur poste réel (Linux et Windows, avec un drive), puis doc utilisateur
-  `docs/user/multi_postes.md` une fois IMPLÉMENTÉ et mergé.
+- Validé sur poste réel par MP (2026-11-20) ; doc utilisateur `docs/user/multi_postes.md`
+  écrite au merge (1.1.0).

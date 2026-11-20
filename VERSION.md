@@ -1,6 +1,6 @@
 # Version
 
-## [Non publié]
+## [1.1.0] - 2026-11-20
 
 ### Ajouté
 - Journal de suivi des projets `pointeuse_suivi.jsonl` (statut, priorité, note par jour ou par semaine) : lecture / écriture et règles de lecture (`suivi.py`), Nouveau fichier de données, `pointeuse.csv` inchangé (CDC suivi_projets.md étapes 1-2, ADR 004)
@@ -10,7 +10,7 @@
 - Rappel au Stop : à l'arrêt d'une tâche, la fenêtre Suivi s'ouvre sur le projet s'il n'a pas encore de note sur la période ; désactivable par `rappel_au_stop = false` dans `[suivi]` (CDC suivi_projets.md étape 5)
 - Bilan, suivi de plusieurs PC : chaque `pointeuse_suivi.jsonl` chargé reçoit un nom de poste (`local` pour celui de la Pointeuse, nom du fichier s'il est parlant, sinon `PC 2`, `PC 3`…) ; les notes des deux postes sur la même période s'affichent côte à côte (avant, deux fichiers du même nom se cachaient l'un l'autre) ; une note lue deux fois n'est comptée qu'une fois (CDC suivi_projets.md étape 7)
 - Plusieurs PC : section `[donnees]` de `pointeuse_config.toml` (`dossier_de_sauvegarde`, `dossier_externe`). Si `dossier_de_sauvegarde` est rempli, après chaque enregistrement `pointeuse.csv`, la config, le journal et `pointeuse_suivi.jsonl` y sont recopiés ; le nom de ce dossier est le nom du poste (écriture sûre, pas de copie si le CSV sauvegardé est plus grand que le local) ; en cas d'échec, nouvel essai après 1, 2, 4… min (1 h au plus), notification unique et info-bulle « Sauvegarde en attente depuis HH:MM ». Le bilan lit en plus les autres postes de `dossier_externe` (un sous-dossier par PC : CSV fusionnés, notes de suivi), ce PC s'appelant « local » et restant le PC principal ; données du bilan en version 3 (CDC multi_postes.md, ADR 005)
-- Doc utilisateur `docs/user/` : guide général (`pointeuse.md`), onglet Pointer, fusion des CSV de plusieurs PC
+- Doc utilisateur `docs/user/` : guide général (`pointeuse.md`), onglet Pointer, fusion des CSV de plusieurs PC, suivi des projets (`suivi_projets.md`), plusieurs PC et sauvegarde (`multi_postes.md`)
 
 ### Modifié
 - **Emplacement des données** : config, CSV et journaux sont lus et écrits dans `data/`, à côté de l'exécutable (avant : directement à côté). **Depuis la V0.1, déplacer à la main** `pointeuse.csv`, `pointeuse_config.toml`, `pointeuse_journal.csv`, `pointeuse_en_cours.json` (et `pointeuse_suivi.jsonl` s'il existe) dans `data/`, Pointeuse fermée, avant de lancer la nouvelle version : pas de reprise automatique. Le verrou `pointeuse.lock` reste à côté de l'exécutable (ADR 005)

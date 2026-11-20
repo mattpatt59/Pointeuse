@@ -42,6 +42,7 @@ Une seule Pointeuse peut tourner sur un même dossier de fichiers.
   | Ouvrir | Ouvre le panneau |
   | Ouvrir le CSV | Ouvre `pointeuse.csv` dans le tableur |
   | Ouvrir la config | Ouvre `pointeuse_config.toml` dans l'éditeur de texte |
+  | Suivi des projets… | Statut, priorité et notes des projets (voir [suivi_projets.md](suivi_projets.md)) |
   | Bilan | Ouvre le bilan dans le navigateur (voir plus bas) |
   | Lancer à l'ouverture de session | Case à cocher : la Pointeuse démarre avec la session |
   | Quitter | Clôture la ligne en cours et ferme la Pointeuse |
@@ -151,20 +152,26 @@ reste en local, rien n'est envoyé.
 - **Filtres** : recherche texte, choix des clients, affichage des pauses.
 - **Exporter** : CSV de la répartition affichée.
 
-Plusieurs postes ? Le bilan sait fusionner les CSV de plusieurs PC sans compter deux
-fois le même moment : voir [fusion.md](fusion.md).
+Onglets **Temps | Suivi des projets** en tête de page : la seconde vue montre, par
+projet, le statut et l'historique des notes (voir [suivi_projets.md](suivi_projets.md)).
+
+Plusieurs postes ? Le bilan lit aussi les sauvegardes des autres PC (voir
+[multi_postes.md](multi_postes.md)) et fusionne leurs CSV sans compter deux fois le même
+moment (voir [fusion.md](fusion.md)).
 
 ---
 
 ## Les fichiers
 
-Tous dans le dossier de l'exécutable.
+Dans le dossier `data/`, à côté de l'exécutable (sauf le verrou, à côté de l'exécutable).
+Sauvegarde automatique possible : voir [multi_postes.md](multi_postes.md).
 
 | Fichier | Rôle |
 |---|---|
 | `pointeuse.csv` | Les pointages. À sauvegarder. |
 | `pointeuse_config.toml` | Clients, projets, tâches, boutons rapides, réglages. Modifiable à la main. |
 | `pointeuse_journal.csv` | Événements du poste, gardés 90 jours. |
+| `pointeuse_suivi.jsonl` | Notes de suivi des projets (voir [suivi_projets.md](suivi_projets.md)). |
 | `pointeuse_en_cours.json` | Sauvegarde de la ligne en cours. Ne pas modifier. |
 | `pointeuse.lock` | Empêche un deuxième lancement. Ne pas modifier. |
 
@@ -209,7 +216,9 @@ liste = ["réunion", "administratif"]
 ```
 
 - « visible » ne peut pas être un nom de projet.
-- Les boutons rapides `[[raccourcis]]` sont décrits dans [onglet_pointer.md](onglet_pointer.md).
+- Les boutons rapides `[[raccourcis]]` sont décrits dans [onglet_pointer.md](onglet_pointer.md),
+  la section `[suivi]` dans [suivi_projets.md](suivi_projets.md), la section `[donnees]`
+  dans [multi_postes.md](multi_postes.md).
 - Si une modification rend le fichier illisible, la Pointeuse garde la dernière
   version valide et affiche l'erreur une fois.
 
@@ -218,6 +227,5 @@ Exemple commenté complet : [docs/exemples/pointeuse_config.toml](../exemples/po
 ### Le journal du poste
 
 `pointeuse_journal.csv` note les démarrages, arrêts, verrouillages et mises en veille.
-Il ne sert qu'à repérer les oublis dans la vue Journée ; le bilan ne le lit pas. Il reste
-local et les lignes de plus de 90 jours sont effacées au démarrage
+Il ne sert qu'à repérer les oublis dans la vue Journée ; le bilan ne le lit pas. Les lignes de plus de 90 jours sont effacées au démarrage
 (`retention_journal_jours = 0` : pas de journal du tout).

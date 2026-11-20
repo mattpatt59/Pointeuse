@@ -1,6 +1,6 @@
 # Pointeuse
 
-_Dernière mise à jour : 2026-11-17_
+_Dernière mise à jour : 2026-11-20_
 
 ## Présentation
 
@@ -69,6 +69,9 @@ python3 -m venv .venv
 - [x] Onglet « À propos » : version, lien du dépôt GitHub, licences, présentation T-Elec — 220 tests au total
 - [x] Version 0.1.0 publiée (première version diffusée : tout ce qui précède, README illustré)
 - [x] Validation sur poste réel Linux et Windows (2026-11-18) : CDC `pointeuse.md`, `onglet_pointer.md`, `fusion.md` passés IMPLÉMENTÉ ; doc utilisateur dans `docs/user/`
+- [x] Suivi des projets : statut, priorité, notes par jour ou semaine (`suivi.py`, `fenetre_suivi.py`, `lecteur/suivi.js`, CDC `suivi_projets.md`, ADR 004)
+- [x] Plusieurs PC : données dans `data/`, sauvegarde automatique, bilan sur les sauvegardes des autres PC (`copie_externe.py`, CDC `multi_postes.md`, ADR 005)
+- [x] Version 1.1.0 (2026-11-20) : CDC `suivi_projets.md` et `multi_postes.md` passés IMPLÉMENTÉ ; doc utilisateur `suivi_projets.md` et `multi_postes.md`
 
 ## Déploiement
 
