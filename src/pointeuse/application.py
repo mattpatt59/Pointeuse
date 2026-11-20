@@ -14,8 +14,10 @@ from pointeuse import demarrage_auto, evenements, settings
 from pointeuse.bilan import CsvAbsent, preparer_bilan
 from pointeuse.absence import DetecteurAbsence, creer_sources
 from pointeuse.affichage import texte_info_bulle
-from pointeuse.chemins import DossierNonInscriptible, est_executable, chemin_config, dossier_programme, verifier_inscriptible
+from pointeuse.chemins import (DossierNonInscriptible, est_executable, chemin_config, dossier_donnees,
+                               dossier_logiciel, verifier_inscriptible)
 from pointeuse.config import Config, ConfigInvalide
+from pointeuse.copie_externe import CopieExterne
 from pointeuse.dialogue_absence import DialogueAbsence
 from pointeuse.evenements import JournalEvenements
 from pointeuse.fenetre_suivi import FenetreSuivi
@@ -29,9 +31,11 @@ from pointeuse.suivi import JournalSuivi
 
 class Application:
 
-    def __init__(self, qapp: QApplication, moteur: Moteur):
+    def __init__(self, qapp: QApplication, moteur: Moteur, copie: CopieExterne | None = None):
         self.qapp = qapp
         self.moteur = moteur
+        # Sauvegarde de data/ dans [donnees] dossier_de_sauvegarde (CDC multi_postes.md) ; None : aucune (tests).
+        self.copie = copie
         self.bloque_signale = False
         self.arret_note = False
 
@@ -75,6 +79,9 @@ class Application:
         self.minuteur_affichage.timeout.connect(self.mettre_a_jour)
         self.minuteur_verification = QTimer(interval=settings.VERIFICATION_MIN * 60 * 1000)
         self.minuteur_verification.timeout.connect(self.verifier)
+        # Nouvel essai de la sauvegarde après un échec : 1, 2, 4… min (CopieExterne).
+        self.minuteur_copie = QTimer(singleShot=True)
+        self.minuteur_copie.timeout.connect(self.essayer_copie)
         qapp.aboutToQuit.connect(self.moteur.arreter)
         qapp.aboutToQuit.connect(self._noter_arret)
 
@@ -117,7 +124,12 @@ class Application:
         moteur = self.moteur
         en_cours = moteur.ligne_ouverte is not None and not moteur.en_pause
         self.icone.setIcon(icone_etat(en_cours, moteur.ecriture_bloquee))
-        self.icone.setToolTip(texte_info_bulle(moteur.ligne_ouverte, datetime.now(), len(moteur.en_attente)))
+        if self.copie is not None and self.copie.a_change():
+            self.essayer_copie()
+        info_bulle = texte_info_bulle(moteur.ligne_ouverte, datetime.now(), len(moteur.en_attente))
+        if self.copie is not None and self.copie.texte_info_bulle():
+            info_bulle += "\n⚠ " + self.copie.texte_info_bulle()
+        self.icone.setToolTip(info_bulle)
         self.panneau.pointer.rafraichir()
         self.panneau.journee.rafraichir()
         if moteur.ecriture_bloquee and not self.bloque_signale:
@@ -144,6 +156,19 @@ class Application:
         if moteur.ecriture_bloquee or en_retard:
             moteur.signe_de_vie()
         self.mettre_a_jour()
+
+    def essayer_copie(self) -> None:
+        """Sauvegarde de data/ : après un enregistrement, ou au réessai.
+
+        Une notification par problème (pas une par essai) ; l'info-bulle dit depuis quand
+        la sauvegarde attend."""
+        self.minuteur_copie.stop()
+        a_signaler = self.copie.essayer()
+        if self.copie.prochain_essai_min is not None:
+            self.minuteur_copie.start(self.copie.prochain_essai_min * 60 * 1000)
+        if a_signaler:
+            self.icone.showMessage(settings.NOM_APPLICATION, self.copie.message(), QSystemTrayIcon.Warning,
+                                   settings.DUREE_NOTIFICATION_MS)
 
     # ─── Panneau ─────────────────────────────────────────────────────────────
 
@@ -260,7 +285,13 @@ class Application:
         La tâche en cours n'y figure pas : elle n'est écrite dans le CSV qu'à sa fin."""
         chemin_csv = self.moteur.journal.chemin
         try:
-            page = preparer_bilan(chemin_csv, chemin_csv.parent, self.suivi.journal_suivi.chemin)
+            externe = None
+            poste = ""
+            if self.copie is not None:
+                externe = self.copie.dossier_externe()
+                poste = self.copie.poste()
+            page = preparer_bilan(chemin_csv, chemin_csv.parent, self.suivi.journal_suivi.chemin,
+                                  externe, poste)
         except CsvAbsent:
             QMessageBox.information(None, settings.NOM_APPLICATION,
                                     f"{chemin_csv.name} n'existe pas encore (il est créé à la première tâche terminée).")
@@ -299,14 +330,17 @@ def main() -> int:
     qapp.setQuitOnLastWindowClosed(False)
     qapp.setStyleSheet(feuille_de_style())
 
-    dossier = dossier_programme()
+    # Verrou dans le dossier du logiciel, données de travail dans data/ (ADR 005).
+    logiciel = dossier_logiciel()
+    dossier = dossier_donnees(logiciel)
     try:
+        verifier_inscriptible(logiciel)
         verifier_inscriptible(dossier)
     except DossierNonInscriptible as erreur:
         QMessageBox.critical(None, settings.NOM_APPLICATION, str(erreur))
         return 1
 
-    verrou = QLockFile(str(dossier / settings.NOM_FICHIER_VERROU))
+    verrou = QLockFile(str(logiciel / settings.NOM_FICHIER_VERROU))
     if not verrou.tryLock(100):
         QMessageBox.information(None, settings.NOM_APPLICATION,
                                 "La pointeuse est déjà lancée (voir la zone de notification).")
@@ -323,7 +357,7 @@ def main() -> int:
                                            lambda: config.reglage("retention_journal_jours"))
     moteur = Moteur(config, Journal(dossier / settings.NOM_FICHIER_CSV), dossier / settings.NOM_FICHIER_EN_COURS,
                     evenements=journal_evenements)
-    application = Application(qapp, moteur)
+    application = Application(qapp, moteur, CopieExterne(dossier, logiciel, config.reglage_donnees))
     application.demarrer()
     code = qapp.exec()
     verrou.unlock()

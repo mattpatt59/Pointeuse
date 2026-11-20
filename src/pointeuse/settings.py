@@ -1,13 +1,29 @@
 """Constantes centralisées de l'application (règle commune §F)."""
 
-# ─── Fichiers (créés dans le dossier du programme, voir chemins.py) ──────────
+# ─── Fichiers (créés dans data/, voir chemins.py) ────────────────────────────
 NOM_FICHIER_CONFIG = "pointeuse_config.toml"
 NOM_FICHIER_CSV = "pointeuse.csv"
 NOM_FICHIER_EN_COURS = "pointeuse_en_cours.json"
 NOM_FICHIER_EVENEMENTS = "pointeuse_journal.csv"   # journal des événements du poste (evenements.py)
+NOM_FICHIER_SUIVI = "pointeuse_suivi.jsonl"        # journal de suivi des projets (suivi.py, ADR 004)
 
-# Dossier utilisé en développement (python -m pointeuse), relatif à la racine du dépôt.
-DOSSIER_DATA_DEV = "data"
+# Données de travail du poste, dans le dossier du logiciel (CDC multi_postes.md).
+# En développement (python -m pointeuse), le dossier du logiciel est la racine du dépôt.
+NOM_DOSSIER_DONNEES = "data"
+
+# ─── Sauvegarde et plusieurs PC (CDC multi_postes.md, ADR 005) ──────────────
+# Section [donnees] du fichier de config, valeurs par défaut. Chemins absolus, ou relatifs
+# au dossier du logiciel.
+DONNEES_DEFAUT = {
+    "dossier_de_sauvegarde": "",        # copie de data/ ; son nom = nom du poste ; vide = pas de sauvegarde
+    "dossier_externe": "data_extern",   # lu par le bilan : un sous-dossier par autre PC ; vide = data_extern
+}
+# Fichiers recopiés dans le dossier de sauvegarde (pas pointeuse_en_cours.json, pas le verrou).
+FICHIERS_COPIES = (NOM_FICHIER_CSV, NOM_FICHIER_CONFIG, NOM_FICHIER_EVENEMENTS, NOM_FICHIER_SUIVI)
+COPIE_DELAI_INITIAL_MIN = 1             # premier nouvel essai après un échec de copie
+COPIE_DELAI_MAX_MIN = 60                # le délai double à chaque échec, jusqu'à ce plafond
+SUFFIXE_COPIE_TEMPORAIRE = ".copie_tmp"  # écriture sûre : temporaire puis renommage
+POSTE_LOCAL = "local"                   # nom du poste courant dans le bilan (= SUIVI.posteLocal côté JS)
 
 # ─── Format du CSV (contrat avec le lecteur de bilan : modifier = ADR) ───
 COLONNES_CSV = ["date_in", "date_out", "client", "projet", "tache", "description", "duree_min"]
@@ -21,7 +37,6 @@ FORMAT_HORODATAGE_EVENEMENT = "%Y-%m-%d %H:%M:%S"
 TROU_MIN_AFFICHE_MIN = 5   # vue Journée : un moment actif non pointé plus court n'est pas montré
 
 # ─── Journal de suivi des projets (contrat avec le lecteur de bilan : modifier = ADR 004) ─
-NOM_FICHIER_SUIVI = "pointeuse_suivi.jsonl"
 ENCODAGE_SUIVI = "utf-8"                 # sans BOM : JSON.parse refuse un BOM en tête de ligne
 VERSION_LIGNE_SUIVI = 1                  # champ « v » de chaque ligne
 FORMAT_HORODATAGE_SUIVI = "%Y-%m-%d %H:%M:%S"
@@ -79,7 +94,7 @@ HAUTEUR_LOGO_A_PROPOS_PX = 56
 NOM_DOSSIER_BILAN = "bilan"
 NOM_FICHIER_DONNEES_BILAN = "pointeuse_donnees_tmp.js"
 MARQUEUR_DONNEES_BILAN = "<!-- POINTEUSE:DONNEES -->"
-VERSION_DONNEES_BILAN = 2   # 2 : + suivi des projets (ADR 004) ; = DONNEES_LOCALES_VERSION dans lecteur/pointeuse.js
+VERSION_DONNEES_BILAN = 3   # 2 : + suivi des projets (ADR 004) ; 3 : + postes du dossier externe (ADR 005) ; = DONNEES_LOCALES_VERSION dans lecteur/pointeuse.js
 NOM_FICHIER_AUTOSTART = "pointeuse.desktop"   # Linux : ~/.config/autostart/
 NOM_FICHIER_VERROU = "pointeuse.lock"   # empêche de lancer deux fois l'appli sur les mêmes fichiers
 # Linux : le thème Qt « gtk3 » (choisi par défaut sous GNOME) fait planter l'appli sur Ubuntu 24.04

@@ -63,7 +63,7 @@ a été retiré est affiché.
 3. Lancer `Pointeuse` (`Pointeuse.exe` sous Windows) dans le dossier `Pointeuse/`.
 
 Pas d'installateur, pas de droits administrateur. Le CSV et la configuration sont
-créés à côté de l'exécutable. Pour le lancer à chaque démarrage : menu de l'icône →
+créés dans le dossier `data/`, à côté de l'exécutable. Pour le lancer à chaque démarrage : menu de l'icône →
 « Lancer à l'ouverture de session ».
 
 - **Windows** : l'exécutable n'est pas signé, SmartScreen peut avertir au premier lancement.

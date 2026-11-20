@@ -16,7 +16,9 @@ cours, ou une pause, ou rien.
 3. Lancer `Pointeuse.exe` (Windows) ou `Pointeuse` (Linux) dans le dossier `Pointeuse/`.
 
 Pas d'installateur ni de droits administrateur. Les fichiers de données sont créés
-**à côté de l'exécutable** : le dossier doit être accessible en écriture.
+dans le dossier **`data/`, à côté de l'exécutable** : le dossier doit être accessible en écriture.
+Depuis une V0.1 : déplacer à la main `pointeuse.csv`, `pointeuse_config.toml` et les autres
+fichiers `pointeuse_*` dans `data/` avant de lancer la nouvelle version.
 
 - **Windows** : l'exécutable n'est pas signé, SmartScreen peut avertir au premier
   lancement (« Informations complémentaires » → « Exécuter quand même »).

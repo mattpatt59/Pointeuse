@@ -22,6 +22,15 @@ afficher_journal = true     # vue Journée : événements et moments non pointé
 periode_note = "jour"     # "jour" ou "semaine" : une note par jour ou par semaine
 rappel_au_stop = true     # au Stop, proposer la note du projet arrêté s'il n'en a pas
 
+# Sauvegarde des données
+# Après chaque enregistrement, data/ (CSV, config, journal, suivi) est recopié dans
+# dossier_de_sauvegarde ; le nom de ce dossier est le nom du poste. Le bilan lit en plus
+# chaque sous-dossier de dossier_externe (un par autre PC). Chemins absolus, ou relatifs
+# au dossier du logiciel.
+[donnees]
+dossier_de_sauvegarde = ""        # vide = fonctionnement sans sauvegarde automatique (ex. "Z:/pointeuse/bureau")
+dossier_externe = "data_extern"   # bilan : un sous-dossier par autre PC (ex. "Z:/pointeuse")
+
 [clients."Alpha Industrie"]
 "Armoire ligne 2" = { taches = ["cdc", "schéma électrique", "câblage"] }
 "Rétrofit presse" = { taches = ["étude", "mise en service", "doc"], visible = false }   # projet fini

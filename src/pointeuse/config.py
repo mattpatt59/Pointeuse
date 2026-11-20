@@ -43,6 +43,11 @@ afficher_journal = true     # vue Journée : événements et moments non pointé
 periode_note = "jour"     # "jour" ou "semaine" : une note par jour ou par semaine
 rappel_au_stop = true     # au Stop, proposer la note du projet arrêté s'il n'en a pas
 
+# Sauvegarde des données
+[donnees]
+dossier_de_sauvegarde = ""        # vide = fonctionnement sans sauvegarde automatique
+dossier_externe = "data_extern"   # bilan : un sous-dossier par autre PC (ex. "Z:/pointeuse")
+
 [clients."Perso"]
 "administratif" = { taches = [] }
 
@@ -168,6 +173,7 @@ def _verifier_structure(donnees: dict) -> None:
             raise ConfigInvalide(f"[reglages] {nom} doit être un nombre entier positif.")
 
     _verifier_suivi(donnees.get("suivi", {}))
+    _verifier_donnees(donnees.get("donnees", {}))
 
     clients = donnees.get("clients", {})
     if not isinstance(clients, dict):
@@ -223,6 +229,20 @@ def _verifier_suivi(suivi) -> None:
                              f"{' ou '.join(repr(p) for p in settings.PERIODES_NOTE)}.")
     if "rappel_au_stop" in suivi and not isinstance(suivi["rappel_au_stop"], bool):
         raise ConfigInvalide("[suivi] rappel_au_stop doit valoir true ou false.")
+
+
+def _verifier_donnees(donnees) -> None:
+    """Section [donnees] (CDC multi_postes.md) : facultative, chaque clé aussi, textes
+    (vides permis : pas de sauvegarde / data_extern)."""
+    if not isinstance(donnees, dict):
+        raise ConfigInvalide("[donnees] doit être une section.")
+    inconnues = [cle for cle in donnees if cle not in settings.DONNEES_DEFAUT]
+    if inconnues:
+        raise ConfigInvalide(f"[donnees] : clé inconnue « {inconnues[0]} » "
+                             f"(autorisées : {', '.join(settings.DONNEES_DEFAUT)}).")
+    for cle in settings.DONNEES_DEFAUT:
+        if cle in donnees and not isinstance(donnees[cle], str):
+            raise ConfigInvalide(f'[donnees] {cle} doit être un texte entre guillemets.')
 
 
 def _verifier_raccourcis(raccourcis) -> None:
@@ -316,6 +336,13 @@ class Config:
         if nom in suivi:
             return suivi[nom]
         return settings.SUIVI_DEFAUT[nom]
+
+    def reglage_donnees(self, nom: str) -> str:
+        """Valeur d'un réglage de [donnees] (dossier_de_sauvegarde, dossier_externe), ou sa valeur par défaut."""
+        donnees = self._donnees.get("donnees", {})
+        if nom in donnees:
+            return str(donnees[nom])
+        return settings.DONNEES_DEFAUT[nom]
 
     def clients(self, inclure_masques: bool = False) -> list[str]:
         """Noms des clients, dans l'ordre du fichier."""

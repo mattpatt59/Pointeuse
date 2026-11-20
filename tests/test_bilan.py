@@ -30,7 +30,8 @@ def test_script_donnees_echappe_tout():
     script = script_donnees("pointeuse.csv", texte)
     assert " " not in script   # fichier .js séparé : « </script> » y est sans effet
     assert relire_donnees(script) == {"version": settings.VERSION_DONNEES_BILAN,
-                                      "nom": "pointeuse.csv", "texte": texte, "suivi": None}
+                                      "nom": "pointeuse.csv", "texte": texte, "suivi": None,
+                                      "postes": [], "note": ""}
     script = script_donnees("pointeuse.csv", "", (settings.NOM_FICHIER_SUIVI, texte))
     assert relire_donnees(script)["suivi"] == {"nom": settings.NOM_FICHIER_SUIVI, "texte": texte}
 

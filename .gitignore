@@ -12,3 +12,7 @@ save/
 .claude/regles_*.md
 docs/maquettes/profil_tmp/
 *.egg-info/
+
+# Dossier du logiciel (ADR 005) : verrou d'instance et dossier externe par défaut
+pointeuse.lock
+data_extern/

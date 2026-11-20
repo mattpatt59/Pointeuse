@@ -41,7 +41,8 @@ python3 -m venv .venv
 | `licences/` | Licences livrées avec l'exécutable (LGPL / GPL v3, composants tiers) |
 | `.github/workflows/` | GitHub Actions : tests, construction, release |
 | `assets/` | Icônes (horloge), ressources UI |
-| `data/` | CSV de pointage en dev (non commité) |
+| `data/` | Données de travail du poste : config, CSV, journaux (non commité) |
+| `data_extern/` | Dossier externe par défaut, lu par le bilan : un sous-dossier par autre PC (non commité) |
 | `docs/cdc/` | Cahiers des charges et spécifications |
 | `docs/adr/` | Décisions d'architecture |
 | `docs/user/` | Doc utilisateur (modules IMPLÉMENTÉ uniquement) |
@@ -71,7 +72,7 @@ python3 -m venv .venv
 
 ## Déploiement
 
-Télécharger le zip de l'OS dans les releases GitHub (ou les artefacts d'un run Actions), le dézipper où l'on veut (`Documents/`, `C:\pointeuse\`) et lancer `Pointeuse` (`Pointeuse.exe`) dans le dossier `Pointeuse/` : le CSV et la config sont créés à côté.
+Télécharger le zip de l'OS dans les releases GitHub (ou les artefacts d'un run Actions), le dézipper où l'on veut (`Documents/`, `C:\pointeuse\`) et lancer `Pointeuse` (`Pointeuse.exe`) dans le dossier `Pointeuse/` : le CSV et la config sont créés dans `data/` à côté (sauvegarde optionnelle et bilan multi-PC : section `[donnees]`, CDC `multi_postes.md`, ADR 005).
 Menu de l'icône → « Lancer à l'ouverture de session » pour le démarrage automatique.
 Linux : si Qt réclame `libxcb-cursor0`, l'installer (`sudo apt install libxcb-cursor0`).
 Windows : exécutable non signé, SmartScreen peut avertir au premier lancement.
