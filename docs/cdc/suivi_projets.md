@@ -227,10 +227,48 @@ Réalisé (étape 6) :
 - [x] Step 1 — Valider le format, ADR `docs/adr/004-journal-suivi.md` (ACCEPTÉ 2026-11-20)
 - [x] Step 2 — `suivi.py` : lecture / ajout dans `pointeuse_suivi.jsonl` (+ tests)
 - [x] Step 3 — Fenêtre « Suivi » (saisie + historique) : menu de l'icône « Suivi des projets… » et bouton « Suivi… » de l'onglet Pointer ; section `[suivi]` de la config (`periode_note`, `rappel_au_stop`) (+ tests)
-- [ ] Step 4 — Masquage des projets `terminé` / statut calculé `terminé ?` (Suivi + onglet Pointer)
-- [ ] Step 5 — Rappel au Stop
+- [x] Step 4 — Masquage des projets `terminé` / statut calculé `terminé ?` (Suivi + onglet Pointer) (+ tests)
+- [x] Step 5 — Rappel au Stop (+ tests)
 - [x] Step 6 — Bilan : page « Suivi » — vue « Suivi des projets » du lecteur (`lecteur/suivi.js` + `pointeuse.js`), réglage « Historique : période du bilan / depuis le … », bouton « Imprimer » (un projet par page) ; `pointeuse_suivi.jsonl` transmis brut par `bilan.py` (`VERSION_DONNEES_BILAN` = 2) ou lu avec « Lire un CSV » / « Ajouter un autre PC » (+ tests JS sur le jeu d'exemple commun)
-- [ ] Step 7 — Fusion multi-postes du journal de suivi
+- [x] Step 7 — Fusion multi-postes du journal de suivi, dans le bilan (`suiviNomsPostes`, `suiviFusionner` de `lecteur/suivi.js`) (+ tests JS). La collecte automatique des journaux des autres postes viendra avec le CDC `multi_postes.md` (PLAN) ; d'ici là, « Ajouter un autre PC »
+
+Réalisé (étape 7, 2026-11-20) :
+
+- Problème corrigé : le nom du fichier servait de nom de poste. Deux PC ont le même
+  `pointeuse_suivi.jsonl`, donc le même « poste » : la note du jour de l'un cachait
+  celle de l'autre (règle « dernière version par poste et par période »).
+- Nom de poste de chaque journal chargé :
+  - `local` pour celui de la Pointeuse qui ouvre le bilan (même mot que `multi_postes.md`) ;
+  - sinon le nom du fichier sans extension s'il est parlant (`portable.jsonl` →
+    `portable`), ou celui du CSV ajouté avec lui (`atelier.csv` → `atelier`) ;
+  - sinon `PC 2`, `PC 3`… dans l'ordre de chargement (noms `pointeuse…` jugés génériques) ;
+  - jamais deux postes du même nom (`portable (2)`).
+  Pour nommer un PC dans le bilan : renommer son jsonl avant de l'ajouter.
+- Une note identique (même horodatage, période, projet, statut, priorité, texte) lue dans
+  deux journaux n'est gardée qu'une fois, sous le premier chargé : même fichier ajouté
+  deux fois, copie du journal local. « Fichiers lus » l'indique (« n déjà lue(s) dans un
+  autre fichier »), comme la règle 5 de `fusion.md` pour les pointages.
+- Pas de PC principal pour le suivi : les notes ne se chevauchent pas, elles s'ajoutent.
+  Statut et priorité : note la plus récente tous postes confondus (inchangé).
+- La fenêtre Suivi de la Pointeuse reste locale (notes de ce PC seulement).
+- Quand `multi_postes.md` sera fait, `bilan.py` transmettra les journaux du dossier
+  externe avec le nom du dossier comme poste (champ `poste` de l'entrée, prioritaire sur
+  le nom calculé).
+
+Réalisé (étapes 4 et 5, 2026-11-20) :
+
+- Onglet Pointer : un projet `terminé` disparaît des listes Projet, comme un projet
+  masqué ; un client dont tous les projets visibles sont terminés disparaît aussi. La
+  case « Afficher les projets masqués » les ré-affiche. Un projet `terminé ?` (temps
+  pointé après la note) reste visible. Les listes sont recalculées à l'ouverture du
+  panneau et à chaque note enregistrée, pas à chaque frappe. Taper le nom d'un projet
+  terminé reste possible (même règle que les projets masqués).
+- Seul l'onglet Pointer filtre : l'onglet Journée et la fenêtre « retour d'absence »
+  gardent toutes les listes (on corrige le passé, où le projet était encore ouvert).
+- Rappel au Stop : sur Stop d'une tâche (pas d'une pause), si `rappel_au_stop` est vrai et
+  que le projet n'a pas de note sur la période en cours (jour ou semaine selon
+  `periode_note`), la fenêtre Suivi s'ouvre directement sur ce projet. Pas de question
+  intermédiaire : fermer la fenêtre suffit pour ne rien écrire.
 
 ---
 
@@ -245,7 +283,8 @@ Réalisé (étape 6) :
 | `src/pointeuse/fenetre_suivi.py` | créer | saisie + historique |
 | `src/pointeuse/config.py` | modifier | section `[suivi]` (réglages seulement) |
 | `src/pointeuse/formulaire.py` | modifier | listes de l'onglet Pointer : masquer les projets `terminé` |
-| `src/pointeuse/panneau.py`, `icone.py` | modifier | accès à la fenêtre, rappel au Stop |
+| `src/pointeuse/panneau.py`, `icone.py` | modifier | accès à la fenêtre ; signal `projet_arrete` émis au Stop d'une tâche |
+| `src/pointeuse/application.py` | modifier | branchements : projets terminés → formulaire, note enregistrée → rechargement des listes, `rappel_au_stop` |
 | `src/pointeuse/bilan.py` | modifier | injecter le suivi (`VERSION_DONNEES_BILAN` + 1) |
 | `src/pointeuse/lecteur/*` | modifier | page « Suivi » : `suivi.js` (lecture + blocs par projet, sans page), `pointeuse.js`, `pointeuse.css`, `index.html` |
 | `docs/adr/004-journal-suivi.md` | créer | format du nouveau fichier |

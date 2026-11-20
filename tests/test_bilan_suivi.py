@@ -182,3 +182,37 @@ def test_filtre_garder(moteur_js):
                            "[P('2026-11-14 09:00','2026-11-14 10:00','Bêta','Carte')], D('2026-11-14'), "
                            "D('2026-11-14'), { clientPause: 'PAUSE', garder: c => c === 'Bêta' }))")
     assert [b["projet"] for b in r] == ["Bêta / Carte"]
+
+
+# ─── Étape 7 : journaux de plusieurs postes ──────────────────────────────────
+
+@pytest.mark.parametrize("jsonl, csv, pris, attendu", [
+    (["pointeuse_suivi.jsonl"], [], ["local"], ["PC 2"]),                  # nom générique : numéro
+    (["pointeuse_suivi (1).jsonl"], [], [], ["PC 1"]),                    # copie téléchargée deux fois
+    (["portable.jsonl"], ["pointeuse.csv"], ["local"], ["portable"]),      # nom du jsonl
+    (["pointeuse_suivi.jsonl"], ["atelier.csv"], ["local"], ["atelier"]),  # nom du CSV lu avec lui
+    (["pointeuse_suivi.jsonl"], ["a.csv", "b.csv"], [], ["PC 1"]),         # deux CSV : on ne devine pas
+    (["pointeuse_suivi.jsonl", "pointeuse_suivi(1).jsonl"], [], ["local", "PC 3"], ["PC 4", "PC 5"]),
+    (["portable.jsonl"], [], ["portable"], ["portable (2)"]),              # jamais deux postes du même nom
+])
+def test_noms_des_postes(moteur_js, jsonl, csv, pris, attendu):
+    assert evaluer(moteur_js, f"JSON.stringify(suiviNomsPostes({json.dumps(jsonl)}, {json.dumps(csv)}, "
+                              f"{json.dumps(pris)}))") == attendu
+
+
+def test_fusion_de_deux_postes(moteur_js):
+    # Le même projet sur deux postes, même jour : les deux notes restent, chacune sous son poste.
+    # La copie du journal local (même contenu, autre poste) n'est comptée qu'une fois.
+    r = evaluer(moteur_js, """(() => {
+        const local = [N('2026-11-14 09:00','2026-11-14','Armoire','en_cours', 0, 'matin', 'local'),
+                       N('2026-11-14 17:00','2026-11-14','Armoire','en_cours', 0, 'soir', 'local')];
+        const copie = [N('2026-11-14 09:00','2026-11-14','Armoire','en_cours', 0, 'matin', 'PC 2')];
+        const portable = [N('2026-11-14 18:00','2026-11-14','Armoire','bloque', -5, 'chez le client', 'portable')];
+        const f = suiviFusionner([local, copie, portable]);
+        return JSON.stringify({ doublons: f.doublons,
+                                bilan: JSON.parse(resumeBilan(suiviBilan(f.notes, [], D('2026-11-14'), D('2026-11-14'),
+                                                                         { clientPause: 'PAUSE' }))) });
+    })()""")
+    assert r["doublons"] == [0, 1, 0]
+    assert r["bilan"] == [{"projet": "Alpha Industrie / Armoire", "statut": "bloque", "priorite": -5, "minutes": 0,
+                           "lignes": ["2026-11-14 0 soir@local|chez le client@portable"]}]

@@ -1,6 +1,8 @@
 """Formulaire Client / Projet / Tâche / Description, commun aux deux onglets et
 à la fenêtre « retour d'absence » (CDC « Commun aux deux onglets »)."""
 
+from collections.abc import Callable
+
 from PySide6.QtWidgets import QComboBox, QFormLayout, QLabel, QLineEdit, QWidget
 
 from pointeuse.config import Config
@@ -28,6 +30,10 @@ class FormulaireTache(QWidget):
         super().__init__(parent)
         self.config = config
         self.afficher_masques = False
+        # Onglet Pointer : (client, projet) terminés dans le suivi, cachés comme les projets masqués
+        # (CDC suivi_projets.md étape 4). Relu à chaque recharger(), pas à chaque frappe.
+        self.source_termines: Callable[[], set[tuple[str, str]]] | None = None
+        self._termines: set[tuple[str, str]] = set()
 
         self.client = QComboBox(editable=True)
         self.projet = QComboBox(editable=True)
@@ -69,7 +75,15 @@ class FormulaireTache(QWidget):
     def recharger(self) -> None:
         """Relit les listes depuis la config, sans perdre ce qui est saisi."""
         client = self.client.currentText()
-        self._remplacer_elements(self.client, self.config.clients(self.afficher_masques), client)
+        self._termines = set()
+        if self.source_termines is not None:
+            self._termines = self.source_termines()
+        clients = []
+        for nom in self.config.clients(self.afficher_masques):
+            # Client dont tous les projets sont terminés : caché lui aussi.
+            if self.afficher_masques or not self.config.projets(nom) or self._projets_affiches(nom):
+                clients.append(nom)
+        self._remplacer_elements(self.client, clients, client)
         self._remplir_projets()
 
     def changer_affichage_masques(self, afficher: bool) -> None:
@@ -77,6 +91,13 @@ class FormulaireTache(QWidget):
         self.recharger()
 
     # ─── Listes dépendantes ──────────────────────────────────────────────────
+
+    def _projets_affiches(self, client: str) -> list[str]:
+        projets = []
+        for projet in self.config.projets(client, self.afficher_masques):
+            if self.afficher_masques or (client, projet) not in self._termines:
+                projets.append(projet)
+        return projets
 
     def _remplir_projets(self, *_) -> None:
         """La liste Projet ne montre que les projets du client choisi.
@@ -86,7 +107,7 @@ class FormulaireTache(QWidget):
         """
         client = self.client.currentText()
         ancien = self.projet.currentText()
-        projets = self.config.projets(client, self.afficher_masques)
+        projets = self._projets_affiches(client)
         tous = self.config.projets(client, inclure_masques=True)
         if _index_sans_casse(tous, ancien) < 0 and projets:
             ancien = projets[0]   # projet d'un autre client : on propose le premier de celui-ci

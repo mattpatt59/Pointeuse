@@ -71,7 +71,8 @@ let couleurs = new Map();  // client → couleur ; absent = « Autres »
 const masques = new Set(); // clients décochés
 let recherche = '';
 let resultat = null;     // dernier calcul (pour l'export et l'info-bulle)
-let suivis = [];         // pointeuse_suivi.jsonl lus : { nom, notes, avertissements } (suivi.js, ADR 004)
+let suivis = [];         // pointeuse_suivi.jsonl lus : { nom, poste, notes, avertissements } (suivi.js, ADR 004)
+let suiviFusion = { notes: [], doublons: [] };   // journaux de tous les postes réunis (suiviFusionner)
 
 const reglages = {
     periode:      'mois',
@@ -308,8 +309,15 @@ function chargerTextes(entrees, ajouter, entreesSuivi) {
         }
         lus.push({ nom, lignes: lignes.length, erreurs: res.erreurs, pointages: lignes });
     }
-    // Notes de suivi : le nom du fichier sert de nom de poste (plusieurs postes : notes côte à côte).
-    const suivisLus = (entreesSuivi || []).map(({ nom, texte }) => Object.assign({ nom }, suiviLire(texte, nom)));
+    // Notes de suivi : un nom de poste par journal (plusieurs postes : notes côte à côte, étape 7).
+    const listeSuivi = entreesSuivi || [];
+    let dejaPris = [];
+    if (ajouter) dejaPris = suivis.map(f => f.poste);
+    const postes = suiviNomsPostes(listeSuivi.map(e => e.nom), entrees.map(e => e.nom), dejaPris);
+    const suivisLus = listeSuivi.map(({ nom, texte, poste }, i) => {
+        const nomPoste = poste || postes[i];
+        return Object.assign({ nom, poste: nomPoste }, suiviLire(texte, nomPoste));
+    });
     if (lus.length === 0 && suivisLus.length === 0) return;
 
     if (ajouter) {
@@ -321,6 +329,7 @@ function chargerTextes(entrees, ajouter, entreesSuivi) {
         suivis = suivisLus;
     }
     fusionnerFichiersCharges();
+    suiviFusion = suiviFusionner(suivis.map(f => f.notes));
     masques.clear();
     recherche = '';
     attribuerCouleurs();
@@ -364,9 +373,9 @@ function lireFichiers(liste, ajouter) {
         .catch(() => toast('Lecture du fichier impossible.', true));
 }
 
-/** Toutes les notes de suivi lues (tous postes). */
+/** Toutes les notes de suivi lues (tous postes, notes en double ignorées). */
 function notesSuivi() {
-    return suivis.flatMap(f => f.notes);
+    return suiviFusion.notes;
 }
 
 function avecDonnees() {
@@ -988,7 +997,7 @@ function texteNote(texte) {
 
 /** Notes d'une période : une seule en général, une par poste si deux postes ont écrit. */
 function htmlNotes(notes) {
-    const plusieursPostes = suivis.length > 1;
+    const plusieursPostes = new Set(suivis.map(f => f.poste)).size > 1;
     return notes.map(n => {
         let poste = '';
         if (plusieursPostes) poste = `<b class="note__poste">${esc(n.poste)}</b> `;
@@ -1140,9 +1149,12 @@ function htmlFichiers() {
             choix = `<label class="fichier__principal"><input type="radio" name="principal" value="${i}"${coche}> PC principal</label>`;
         }
         return `<div class="fichier"><b>${esc(f.nom)}</b> — ${f.lignes} ligne(s)${fusionTexte}${choix}${erreurs}</div>`;
-    }).join('') + suivis.map(f => {
+    }).join('') + suivis.map((f, i) => {
+        let doublons = '';
+        if (suiviFusion.doublons[i] > 0) doublons = ` · ${suiviFusion.doublons[i]} déjà lue(s) dans un autre fichier`;
         // Lignes abîmées : mêmes messages que la Pointeuse (fenêtre « Suivi »).
-        return `<div class="fichier"><b>${esc(f.nom)}</b> — ${f.notes.length} note(s) de suivi${listeErreurs(f.avertissements)}</div>`;
+        return `<div class="fichier"><b>${esc(f.nom)}</b> — poste « ${esc(f.poste)} » — ` +
+            `${f.notes.length} note(s) de suivi${doublons}${listeErreurs(f.avertissements)}</div>`;
     }).join('');
 }
 
@@ -1446,6 +1458,7 @@ function surAction(action) {
         principal = 0;
         fusion = null;
         suivis = [];
+        suiviFusion = { notes: [], doublons: [] };
         masques.clear();
         recherche = '';
         toutAfficher();
@@ -1569,7 +1582,8 @@ if (donneesLocales && donneesLocales.version === DONNEES_LOCALES_VERSION && type
     const entreesSuivi = [];
     const suiviLocal = donneesLocales.suivi;
     if (suiviLocal && typeof suiviLocal.texte === 'string') {
-        entreesSuivi.push({ nom: String(suiviLocal.nom || 'pointeuse_suivi.jsonl'), texte: suiviLocal.texte });
+        entreesSuivi.push({ nom: String(suiviLocal.nom || 'pointeuse_suivi.jsonl'), texte: suiviLocal.texte,
+                            poste: SUIVI.posteLocal });
     }
     chargerTextes([{ nom: String(donneesLocales.nom || 'pointeuse.csv'), texte: donneesLocales.texte }], false, entreesSuivi);
 } else if (donneesLocales) {

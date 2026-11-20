@@ -258,6 +258,16 @@ def est_masque(statut: str | None) -> bool:
     return statut == settings.STATUT_TERMINE
 
 
+def projets_termines(notes: list[NoteSuivi], lignes: list[Ligne]) -> set[tuple[str, str]]:
+    """(client, projet) masqués des listes de l'onglet Pointer : terminés et confirmés.
+    Un projet « terminé ? » (du temps pointé après la note) reste visible."""
+    resultat = set()
+    for cle, etat in etats_actuels(notes).items():
+        if est_masque(statut_affiche(etat, dernier_pointage(lignes, *cle))):
+            resultat.add(cle)
+    return resultat
+
+
 def note_de_periode(notes: list[NoteSuivi], client: str, projet: str, periode: str,
                     poste: str = "") -> NoteSuivi | None:
     """Version actuelle de la note d'une période (la plus récente), pour un poste."""

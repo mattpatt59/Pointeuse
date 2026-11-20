@@ -9,7 +9,7 @@
 
 from datetime import date, datetime
 
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate, Qt, Signal
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDateEdit, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
                                QPlainTextEdit, QPushButton, QSpinBox, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
                                QWidget)
@@ -20,7 +20,8 @@ from pointeuse.journal import Ligne
 from pointeuse.moteur import Moteur
 from pointeuse.suivi import (JournalSuivi, NoteSuivi, ProjetSuivi, etats_actuels, extrait, historique,
                              jours_de_periode, libelle_statut, minutes_par_jour, note_de_periode, note_precedente,
-                             nouvelle_note, periode_de, projets_suivis)
+                             nouvelle_note, periode_de, projets_suivis,
+                             projets_termines)
 
 ROLE_CLE = Qt.UserRole
 
@@ -38,6 +39,8 @@ def _titre_section(texte: str) -> QLabel:
 
 
 class FenetreSuivi(QWidget):
+
+    note_enregistree = Signal()   # les listes de l'onglet Pointer cachent les projets terminés
 
     def __init__(self, moteur: Moteur, journal_suivi: JournalSuivi, horloge=datetime.now, parent=None):
         super().__init__(parent, Qt.Window)
@@ -374,7 +377,21 @@ class FenetreSuivi(QWidget):
             return False
         self.modifie = False
         self.recharger()   # même projet : la date choisie est gardée
+        self.note_enregistree.emit()
         return True
+
+    # ─── Pour le reste de l'appli (sans toucher à l'affichage) ───────────────
+
+    def projets_termines(self) -> set[tuple[str, str]]:
+        """Projets terminés et confirmés, à cacher des listes de l'onglet Pointer."""
+        notes, _ = self.journal_suivi.lire()
+        return projets_termines(notes, self._lignes_pointees())
+
+    def a_une_note(self, client: str, projet: str) -> bool:
+        """Le projet a-t-il déjà une note sur la période en cours (rappel au Stop) ?"""
+        notes, _ = self.journal_suivi.lire()
+        periode = periode_de(self.horloge().date(), self.mode_periode)
+        return note_de_periode(notes, client, projet, periode) is not None
 
     def closeEvent(self, evenement) -> None:
         if not self._abandon_accepte():

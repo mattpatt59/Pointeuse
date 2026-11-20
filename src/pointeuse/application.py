@@ -40,6 +40,10 @@ class Application:
         self.panneau.journee.etat_change.connect(self.mettre_a_jour)
         self.suivi = FenetreSuivi(moteur, JournalSuivi(moteur.journal.chemin.parent / settings.NOM_FICHIER_SUIVI))
         self.panneau.pointer.suivi_demande.connect(self.suivi.ouvrir)
+        self.panneau.pointer.projet_arrete.connect(self.rappel_au_stop)
+        self.panneau.pointer.formulaire.source_termines = self.suivi.projets_termines
+        self.suivi.note_enregistree.connect(self.panneau.pointer.formulaire.recharger)
+        self.panneau.pointer.formulaire.recharger()
 
         self.icone = QSystemTrayIcon()
         self.icone.activated.connect(self._icone_activee)
@@ -142,6 +146,14 @@ class Application:
         self.mettre_a_jour()
 
     # ─── Panneau ─────────────────────────────────────────────────────────────
+
+    def rappel_au_stop(self, client: str, projet: str) -> None:
+        """Stop : ouvre la fenêtre Suivi sur le projet arrêté s'il n'a pas encore de note sur la période."""
+        if not self.moteur.config.reglage_suivi("rappel_au_stop"):
+            return
+        if self.suivi.a_une_note(client, projet):
+            return
+        self.suivi.ouvrir(client, projet)
 
     def _icone_activee(self, raison) -> None:
         if raison == QSystemTrayIcon.Trigger:

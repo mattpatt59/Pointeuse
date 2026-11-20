@@ -4,6 +4,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,10 +14,12 @@ from PySide6.QtCore import QDate  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from pointeuse import settings  # noqa: E402
+from pointeuse.application import Application  # noqa: E402
 from pointeuse.config import Config  # noqa: E402
 from pointeuse.fenetre_suivi import FenetreSuivi, libelle_periode  # noqa: E402
 from pointeuse.journal import Journal, Ligne  # noqa: E402
 from pointeuse.moteur import Moteur  # noqa: E402
+from pointeuse.panneau import Panneau  # noqa: E402
 from pointeuse.suivi import JournalSuivi, NoteSuivi  # noqa: E402
 
 EXEMPLE = Path(__file__).resolve().parents[1] / "docs" / "exemples" / "pointeuse_config.toml"
@@ -51,6 +54,22 @@ def fenetre(qapp, moteur, journal_suivi, horloge):
     yield f
     f.modifie = False
     f.deleteLater()
+
+
+@pytest.fixture
+def pointer(qapp, moteur, fenetre, horloge):
+    """Onglet Pointer relié à la fenêtre Suivi, comme dans application.py."""
+    panneau = Panneau(moteur, horloge=lambda: horloge["t"])
+    formulaire = panneau.pointer.formulaire
+    formulaire.source_termines = fenetre.projets_termines
+    fenetre.note_enregistree.connect(formulaire.recharger)
+    formulaire.recharger()
+    yield panneau.pointer
+    panneau.deleteLater()
+
+
+def elements(liste):
+    return [liste.itemText(i) for i in range(liste.count())]
 
 
 def ecrire(journal_suivi, horodatage, periode, statut="en_cours", priorite=0, texte="", cle=ALPHA):
@@ -203,3 +222,82 @@ def test_mode_semaine(fenetre, moteur, journal_suivi):
     assert fenetre.enregistrer()
     notes, _ = journal_suivi.lire()
     assert notes[0].periode == "2026-W47"
+
+
+# ─── Étape 4 : projets terminés cachés dans l'onglet Pointer ─────────────────
+
+def test_pointer_cache_les_projets_termines(pointer, fenetre, journal_suivi, moteur, horloge):
+    formulaire = pointer.formulaire
+    assert "Alpha Industrie" in elements(formulaire.client)
+    # Note « terminé » enregistrée depuis la fenêtre : les listes se mettent à jour tout de suite.
+    fenetre.ouvrir(*ALPHA)
+    fenetre.statut.setCurrentIndex(fenetre.statut.findData("termine"))
+    assert fenetre.enregistrer()
+    # Seul projet visible d'Alpha Industrie terminé : le client disparaît aussi.
+    assert "Alpha Industrie" not in elements(formulaire.client)
+    formulaire.client.setCurrentText("Bêta Automatismes")
+    ecrire(journal_suivi, "2026-11-17 17:30", "2026-11-17", statut="termine",
+           cle=("Bêta Automatismes", "Firmware passerelle"))
+    formulaire.recharger()
+    assert elements(formulaire.projet) == ["Carte capteur v2"]
+    # « Afficher les projets masqués » : tout revient.
+    pointer.masques.setChecked(True)
+    assert "Alpha Industrie" in elements(formulaire.client)
+    assert elements(formulaire.projet) == ["Carte capteur v2", "Firmware passerelle"]
+    pointer.masques.setChecked(False)
+    # Du temps pointé après la note : « terminé ? », le projet revient dans les listes.
+    moteur.journal.ajouter([Ligne(datetime(2026, 11, 17, 18, 0), datetime(2026, 11, 17, 18, 30),
+                                  "Bêta Automatismes", "Firmware passerelle", "", "")])
+    formulaire.recharger()
+    assert elements(formulaire.projet) == ["Carte capteur v2", "Firmware passerelle"]
+
+
+def test_pointer_projet_termine_tape_a_la_main(pointer, journal_suivi, moteur):
+    ecrire(journal_suivi, "2026-11-16 17:00", "2026-11-16", statut="termine")
+    pointer.formulaire.recharger()
+    pointer.formulaire.remplir(*ALPHA)
+    pointer.demarrer()
+    assert moteur.ligne_ouverte.projet == ALPHA[1]
+    assert pointer.formulaire.projet.currentText() == ALPHA[1]   # gardé, comme un projet masqué
+
+
+# ─── Étape 5 : rappel au Stop ────────────────────────────────────────────────
+
+def test_stop_signale_le_projet_arrete(pointer, moteur, horloge):
+    arretes = []
+    pointer.projet_arrete.connect(lambda client, projet: arretes.append((client, projet)))
+    pointer.formulaire.remplir(*ALPHA)
+    pointer.demarrer()
+    horloge["t"] = datetime(2026, 11, 17, 18, 0)
+    pointer.pause_ou_reprendre()
+    pointer.stop()                      # arrêt pendant une pause : pas de rappel
+    assert arretes == []
+    pointer.formulaire.remplir(*ALPHA)
+    pointer.demarrer()
+    horloge["t"] = datetime(2026, 11, 17, 18, 30)
+    pointer.stop()
+    assert arretes == [ALPHA]
+
+
+def test_rappel_au_stop(fenetre, journal_suivi, moteur, monkeypatch):
+    ouverts = []
+    monkeypatch.setattr(fenetre, "ouvrir", lambda *cle: ouverts.append(cle))
+    application = SimpleNamespace(moteur=moteur, suivi=fenetre)
+    Application.rappel_au_stop(application, *ALPHA)
+    assert ouverts == [ALPHA]           # pas encore de note aujourd'hui : la fenêtre s'ouvre
+    ecrire(journal_suivi, "2026-11-17 16:00", "2026-11-17")
+    Application.rappel_au_stop(application, *ALPHA)
+    assert ouverts == [ALPHA]           # note du jour déjà écrite : rien
+    moteur.config.reglage_suivi = lambda nom: False
+    Application.rappel_au_stop(application, "Bêta Automatismes", "Carte capteur v2")
+    assert ouverts == [ALPHA]           # rappel désactivé ([suivi] rappel_au_stop = false)
+
+
+def test_rappel_au_stop_mode_semaine(fenetre, journal_suivi, moteur, monkeypatch):
+    ouverts = []
+    monkeypatch.setattr(fenetre, "ouvrir", lambda *cle: ouverts.append(cle))
+    reglages = {"periode_note": settings.PERIODE_SEMAINE, "rappel_au_stop": True}
+    moteur.config.reglage_suivi = reglages.get
+    ecrire(journal_suivi, "2026-11-16 18:00", "2026-W47")   # note de la semaine, écrite lundi
+    Application.rappel_au_stop(SimpleNamespace(moteur=moteur, suivi=fenetre), *ALPHA)
+    assert ouverts == []

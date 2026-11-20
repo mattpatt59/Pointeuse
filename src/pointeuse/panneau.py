@@ -21,6 +21,7 @@ class OngletPointer(QWidget):
 
     etat_change = Signal()
     suivi_demande = Signal(str, str)   # client, projet du formulaire : ouvrir la fenêtre « Suivi »
+    projet_arrete = Signal(str, str)   # Stop sur une tâche : rappel de la note de suivi (CDC suivi_projets.md)
 
     def __init__(self, moteur: Moteur, horloge=datetime.now, parent=None):
         super().__init__(parent)
@@ -252,8 +253,11 @@ class OngletPointer(QWidget):
         self._apres_action()
 
     def stop(self) -> None:
+        ligne = self.moteur.ligne_ouverte
         self.moteur.arreter()
         self._apres_action()
+        if ligne is not None and not ligne.est_pause and ligne.projet:
+            self.projet_arrete.emit(ligne.client, ligne.projet)
 
     def repas(self) -> None:
         self.moteur.pause(settings.DESCRIPTION_REPAS)

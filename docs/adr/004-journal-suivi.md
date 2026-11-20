@@ -68,7 +68,9 @@ Contraintes :
 - `terminé ?` n'est **jamais écrit** : il est calculé (projet `termine` avec du temps
   pointé après la note qui l'a terminé).
 - Le **poste** n'est pas dans la ligne : c'est le nom du dossier du poste dans le dossier
-  externe (CDC `multi_postes.md`), ajouté par le bilan à la lecture.
+  externe (CDC `multi_postes.md`), ajouté par le bilan à la lecture. En attendant ce
+  dossier : `local` pour le journal de la Pointeuse, puis le nom du fichier ou `PC 2`,
+  `PC 3`… pour ceux ajoutés à la main (CDC `suivi_projets.md` étape 7). Format inchangé.
 - Projet **renommé** dans la config : les anciennes notes gardent l'ancien nom, comme les
   lignes de `pointeuse.csv`. Pas de reprise automatique.
 

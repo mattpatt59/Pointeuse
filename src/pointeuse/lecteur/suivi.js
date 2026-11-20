@@ -26,6 +26,9 @@ const SUIVI = {
     prioriteMax:      99,
     prioriteDefaut:   0,
     champsTexte:      ['horodatage', 'periode', 'client', 'projet', 'statut', 'texte'],
+    posteLocal:       'local',                // journal du PC qui ouvre le bilan (CDC multi_postes.md)
+    prefixePoste:     'PC ',                  // poste sans nom parlant : « PC 2 », « PC 3 »…
+    nomGenerique:     /^pointeuse/i,          // pointeuse_suivi.jsonl, pointeuse.csv, « pointeuse_suivi (1).jsonl »…
 };
 
 /* ─── Dates (jours civils, heure locale) ─── */
@@ -175,6 +178,73 @@ function suiviTrier(notes) {
     return notes.map((n, i) => [n, i])
         .sort((a, b) => (a[0].horodatage - b[0].horodatage) || (a[1] - b[1]))
         .map(x => x[0]);
+}
+
+/* ─── Plusieurs postes (CDC suivi_projets.md étape 7) ─── */
+
+/** Nom de poste tiré d'un nom de fichier (sans extension), ou '' s'il est générique. */
+function suiviNomDepuisFichier(nom) {
+    const texte = String(nom || '').trim();
+    if (!texte || SUIVI.nomGenerique.test(texte)) return '';
+    return texte.replace(/\.[^.]*$/, '').trim();
+}
+
+/**
+ * Noms de poste des jsonl lus ensemble (un même « Ajouter un autre PC »).
+ * Un seul jsonl : nom tiré du jsonl, sinon du CSV lu avec lui (s'il est seul), sinon « PC n ».
+ * Plusieurs jsonl : un poste chacun. Un nom déjà pris reçoit « (2) », « (3) »… :
+ * deux PC ne se partagent jamais un nom, sinon la note de l'un cacherait celle de l'autre.
+ */
+function suiviNomsPostes(nomsJsonl, nomsCsv, dejaPris) {
+    const pris = new Set(dejaPris || []);
+    return nomsJsonl.map(nom => {
+        let base = suiviNomDepuisFichier(nom);
+        if (!base && nomsJsonl.length === 1 && nomsCsv.length === 1) base = suiviNomDepuisFichier(nomsCsv[0]);
+        let choisi = base;
+        if (!base) {
+            let numero = pris.size + 1;
+            while (pris.has(SUIVI.prefixePoste + numero)) numero++;
+            choisi = SUIVI.prefixePoste + numero;
+        } else {
+            let numero = 2;
+            while (pris.has(choisi)) {
+                choisi = base + ' (' + numero + ')';
+                numero++;
+            }
+        }
+        pris.add(choisi);
+        return choisi;
+    });
+}
+
+/** Contenu d'une note, sans le poste. */
+function suiviCleNote(n) {
+    return [n.horodatage.getTime(), n.periode, n.client, n.projet, n.statut, n.priorite, n.texte].join('\u0001');
+}
+
+/**
+ * Journaux de plusieurs postes (listes de notes, dans l'ordre de chargement) → une seule liste.
+ * { notes : toutes les notes triées par horodatage, doublons : nb de notes ignorées par liste }.
+ * Une note identique à une note d'une liste précédente (même fichier lu deux fois, copie du
+ * journal local dans le dossier externe) n'est gardée qu'une fois, sous le premier poste.
+ */
+function suiviFusionner(listes) {
+    const vues = new Set();
+    const notes = [];
+    const doublons = listes.map(liste => {
+        let ignorees = 0;
+        for (const n of liste) {
+            const cle = suiviCleNote(n);
+            if (vues.has(cle)) {
+                ignorees++;
+                continue;
+            }
+            vues.add(cle);
+            notes.push(n);
+        }
+        return ignorees;
+    });
+    return { notes: suiviTrier(notes), doublons };
 }
 
 /* ─── Règles de lecture (ADR 004) ─── */
